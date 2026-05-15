@@ -14,7 +14,14 @@
 </p>
 
 <p align="center">
-  <a href="#quickstart">快速开始</a> ·
+  <a href="https://butea-post.vercel.app">
+    <img src="https://img.shields.io/badge/▶︎_Try_the_live_demo-EA580C?style=for-the-badge&labelColor=0A0A0A" alt="Try the live demo" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://butea-post.vercel.app">在线试用</a> ·
+  <a href="#quickstart">本地运行</a> ·
   <a href="#features">功能</a> ·
   <a href="#architecture">架构</a> ·
   <a href="#roadmap">路线图</a> ·
