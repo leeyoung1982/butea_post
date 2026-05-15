@@ -39,3 +39,38 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# =====================================================================
+# Secrets — never commit these. BYOK keys, OAuth tokens, service creds.
+# =====================================================================
+*.key
+*.pem
+*_key
+*_token
+*_secret
+credentials.json
+secrets/
+.secrets/
+
+# Anything that looks like a personal API key file
+*api-key*
+*api_key*
+
+# =====================================================================
+# Private working files — internal planning / handoff notes that shouldn't
+# go public. Delete from the working tree before pushing (or `git rm
+# --cached <file>` if already tracked).
+# =====================================================================
+HANDOFF.md
+PLAN.md
+PLAN_v2.md
+PLAN_*.md
+NOTES.md
+SCRATCH.md
+
+# =====================================================================
+# Local agent / editor config — session-specific, don't sync to GitHub.
+# =====================================================================
+.claude/
+.cursor/
+.aider*
