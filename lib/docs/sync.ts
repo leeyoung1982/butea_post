@@ -10,6 +10,7 @@ import {
   purgeExpiredTrash,
 } from "./store";
 import { seedStarterAsset, deleteMedia } from "@/lib/media/store";
+import { STARTER_DOCS } from "@/lib/starter";
 import type { ButeaDocument } from "./types";
 
 // Starter media ids — the welcome doc references these as
@@ -142,12 +143,13 @@ export function DocSync() {
           useWorkshop,
         });
         lastLoadedRef.current = doc.id;
-      } else {
-        const seedMd = markdown && markdown.trim() ? markdown : DEFAULT_MARKDOWN;
-        const seedTitle = extractTitle(seedMd) || "未命名文档";
+      } else if (markdown && markdown.trim() && markdown !== DEFAULT_MARKDOWN) {
+        // User had pre-v3 in-memory markdown (legacy migration). Adopt it
+        // as a single document.
+        const seedTitle = extractTitle(markdown) || "未命名文档";
         const doc = await createDocument({
           title: seedTitle,
-          markdown: seedMd,
+          markdown,
           source: { kind: "local" },
         });
         setActiveDocId(doc.id);
@@ -157,6 +159,40 @@ export function DocSync() {
           useWorkshop,
         });
         lastLoadedRef.current = doc.id;
+        bumpDocList();
+      } else {
+        // First-time install — seed all 8 starter docs. Order them so
+        // doc #1 sits at the top (newest updatedAt).
+        const baseTime = Date.now();
+        const total = STARTER_DOCS.length;
+        let firstId: string | null = null;
+        for (let i = 0; i < total; i++) {
+          const entry = STARTER_DOCS[i];
+          // Stagger createdAt so updatedAt-desc places #1 at the top
+          const offset = (total - i) * 10;
+          const doc = await createDocument({
+            title: entry.title,
+            markdown: entry.markdown,
+            source: { kind: "local" },
+          });
+          // Backdate older entries so the first one stays freshest
+          doc.createdAt = baseTime + offset;
+          doc.updatedAt = baseTime + offset;
+          await putDocument(doc);
+          if (i === 0) firstId = doc.id;
+        }
+        if (firstId) {
+          const doc = await getDocument(firstId);
+          if (doc) {
+            setActiveDocId(doc.id);
+            applyDocToStore(doc, {
+              setMarkdown,
+              setActiveDocTitle,
+              useWorkshop,
+            });
+            lastLoadedRef.current = doc.id;
+          }
+        }
         bumpDocList();
       }
       saveLock.current = false;
