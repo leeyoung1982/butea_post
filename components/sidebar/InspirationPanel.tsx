@@ -13,7 +13,7 @@ import {
 import { useWorkshop, DEFAULT_MARKDOWN } from "@/lib/store";
 import { loadSettings } from "@/lib/llm/providers";
 import { streamChat } from "@/lib/llm/client";
-import { getEditorView } from "@/lib/editor-ref";
+import { getTipTapEditor } from "@/lib/editor-ref";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -120,15 +120,22 @@ function OutlineView() {
   }, [markdownValue]);
 
   const jump = (lineIndex: number) => {
-    const view = getEditorView();
-    if (!view) return;
-    const doc = view.state.doc;
-    const line = doc.line(Math.min(lineIndex + 1, doc.lines));
-    view.dispatch({
-      selection: { anchor: line.from },
-      scrollIntoView: true,
+    const editor = getTipTapEditor();
+    if (!editor) return;
+    const target = outline.find((h) => h.lineIndex === lineIndex);
+    if (!target) return;
+    let targetPos = 0;
+    let found = false;
+    editor.state.doc.descendants((node, pos) => {
+      if (found) return false;
+      if (node.type.name === "heading" && node.textContent.trim() === target.text) {
+        targetPos = pos;
+        found = true;
+        return false;
+      }
+      return true;
     });
-    view.focus();
+    editor.chain().focus().setTextSelection(targetPos).scrollIntoView().run();
   };
 
   if (outline.length === 0) {

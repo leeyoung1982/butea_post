@@ -28,7 +28,7 @@ import {
 } from "@/lib/docs/store";
 import type { ButeaDocument, TrashedDocument } from "@/lib/docs/types";
 import { TRASH_TTL_DAYS } from "@/lib/docs/types";
-import { ObsidianPanel } from "@/components/obsidian/ObsidianPanel";
+import { ObsidianPanel } from "@/components/sidebar/ObsidianPanel";
 import { importFile, ACCEPT_ATTR } from "@/lib/docs/import";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ const EXTERNAL_SOURCES: {
     id: "obsidian",
     label: "Obsidian",
     ready: true,
-    blurb: "通过 Local REST API 插件读写本地 Vault",
+    blurb: "选择 Vault 文件夹，浏览并导入笔记",
   },
   {
     id: "notion",

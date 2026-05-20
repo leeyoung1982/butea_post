@@ -11,11 +11,6 @@ import {
   type MediaRecord,
 } from "@/lib/media/store";
 import { toast } from "@/components/ui/toast";
-import { getEditorView } from "@/lib/editor-ref";
-import {
-  bumpMediaVersion,
-  refreshImagePreviews,
-} from "@/lib/editor-image-preview";
 import { clamp } from "@/lib/utils";
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -162,9 +157,6 @@ export function ImageEditorDialog({
         // the version + dispatch a refresh effect so the editor's image
         // widget rebuilds with the new pixels.
         await updateMediaInPlace(rec.id, blob, `${stem}.jpg`);
-        bumpMediaVersion(rec.id);
-        const view = getEditorView();
-        if (view) view.dispatch({ effects: refreshImagePreviews.of() });
         toast.success("已覆盖原图");
       } else {
         await saveMedia(blob, `${stem}.edited.jpg`);

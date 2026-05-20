@@ -17,7 +17,7 @@ import { useWorkshop, DEFAULT_MARKDOWN } from "@/lib/store";
 import { loadSettings, loadWritingPreferences } from "@/lib/llm/providers";
 import { streamChat } from "@/lib/llm/client";
 import { STRATEGY_INVISIBILITY, withPrefs } from "@/lib/llm/skills";
-import { getEditorView } from "@/lib/editor-ref";
+import { getTipTapEditor } from "@/lib/editor-ref";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
@@ -274,15 +274,40 @@ function OutlineView() {
   }, [markdownValue]);
 
   const jump = (lineIndex: number) => {
-    const view = getEditorView();
-    if (!view) return;
-    const doc = view.state.doc;
-    const line = doc.line(Math.min(lineIndex + 1, doc.lines));
-    view.dispatch({
-      selection: { anchor: line.from },
-      scrollIntoView: true,
+    const editor = getTipTapEditor();
+    if (!editor) return;
+    // Find the Nth heading in the TipTap doc and scroll to it
+    let headingCount = 0;
+    let targetPos = 0;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "heading") {
+        if (headingCount === lineIndex) {
+          targetPos = pos;
+          return false;
+        }
+        headingCount++;
+      }
+      return true;
     });
-    view.focus();
+    // Map lineIndex to actual heading index in our outline
+    const target = outline[outline.findIndex((h) => h.lineIndex === lineIndex)];
+    if (!target) return;
+    // Walk doc to find the heading
+    let idx = 0;
+    let found = false;
+    editor.state.doc.descendants((node, pos) => {
+      if (found) return false;
+      if (node.type.name === "heading") {
+        if (node.textContent.trim() === target.text) {
+          targetPos = pos;
+          found = true;
+          return false;
+        }
+        idx++;
+      }
+      return true;
+    });
+    editor.chain().focus().setTextSelection(targetPos).scrollIntoView().run();
   };
 
   if (outline.length === 0) {

@@ -7,7 +7,7 @@
 
 import { getMedia, MEDIA_URL_PREFIX } from "./store";
 
-export type HostId = "imgur" | "github";
+export type HostId = "imgur" | "github" | "r2";
 
 export type ImgurConfig = {
   hostId: "imgur";
@@ -23,7 +23,18 @@ export type GitHubConfig = {
   pathPrefix: string; // e.g. "images/butea/"
 };
 
-export type HostConfig = ImgurConfig | GitHubConfig;
+export type R2Config = {
+  hostId: "r2";
+  accountId: string;
+  bucketName: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Custom domain for public access, e.g. "https://img.butea.io" */
+  publicUrl: string;
+  pathPrefix: string; // e.g. "butea/"
+};
+
+export type HostConfig = ImgurConfig | GitHubConfig | R2Config;
 
 const STORAGE_KEY = "butea:image-host";
 
@@ -148,6 +159,98 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+/** Cloudflare R2 upload via S3-compatible PutObject with AWS Signature V4. */
+async function uploadToR2(cfg: R2Config, blob: Blob, name: string): Promise<string> {
+  const safeName = name.replace(/[^\w.\-]/g, "_");
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const key = `${cfg.pathPrefix.replace(/\/$/, "")}/${stamp}-${safeName}`;
+  const endpoint = `https://${cfg.accountId}.r2.cloudflarestorage.com`;
+  const url = `${endpoint}/${cfg.bucketName}/${key}`;
+
+  const now = new Date();
+  const dateStamp = now.toISOString().replace(/[-:]/g, "").slice(0, 8);
+  const amzDate = dateStamp + "T" + now.toISOString().replace(/[-:]/g, "").slice(9, 15) + "Z";
+  const region = "auto";
+  const service = "s3";
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+
+  // Hash payload
+  const payloadBuf = await blob.arrayBuffer();
+  const payloadHash = await sha256Hex(new Uint8Array(payloadBuf));
+
+  const headers: Record<string, string> = {
+    Host: `${cfg.accountId}.r2.cloudflarestorage.com`,
+    "Content-Type": blob.type || "application/octet-stream",
+    "x-amz-content-sha256": payloadHash,
+    "x-amz-date": amzDate,
+  };
+
+  // Canonical request
+  const signedHeaderNames = Object.keys(headers).map((k) => k.toLowerCase()).sort();
+  const signedHeaders = signedHeaderNames.join(";");
+  const canonicalHeaders = signedHeaderNames
+    .map((k) => `${k}:${headers[Object.keys(headers).find((h) => h.toLowerCase() === k)!].trim()}`)
+    .join("\n") + "\n";
+  const canonicalUri = `/${cfg.bucketName}/${key}`;
+  const canonicalRequest = [
+    "PUT",
+    canonicalUri,
+    "", // query string
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+
+  const canonicalRequestHash = await sha256Hex(new TextEncoder().encode(canonicalRequest));
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    canonicalRequestHash,
+  ].join("\n");
+
+  // Signing key
+  const kDate = await hmacSha256(new TextEncoder().encode("AWS4" + cfg.secretAccessKey), new TextEncoder().encode(dateStamp));
+  const kRegion = await hmacSha256(kDate, new TextEncoder().encode(region));
+  const kService = await hmacSha256(kRegion, new TextEncoder().encode(service));
+  const kSigning = await hmacSha256(kService, new TextEncoder().encode("aws4_request"));
+  const signature = await hmacSha256Hex(kSigning, new TextEncoder().encode(stringToSign));
+
+  const authorization = `AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      ...headers,
+      Authorization: authorization,
+    },
+    body: blob,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`R2 上传失败: ${res.status} ${text.slice(0, 200)}`);
+  }
+
+  const publicBase = cfg.publicUrl.replace(/\/$/, "");
+  return `${publicBase}/${key}`;
+}
+
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", data as unknown as BufferSource);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmacSha256(key: Uint8Array | ArrayBuffer, data: Uint8Array): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey("raw", key as unknown as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return crypto.subtle.sign("HMAC", cryptoKey, data as unknown as BufferSource);
+}
+
+async function hmacSha256Hex(key: Uint8Array | ArrayBuffer, data: Uint8Array): Promise<string> {
+  const sig = await hmacSha256(key, data);
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ---------- Public API ----------
 
 export async function uploadOne(mediaId: string): Promise<string> {
@@ -161,6 +264,7 @@ export async function uploadOne(mediaId: string): Promise<string> {
 
   let url: string;
   if (cfg.hostId === "imgur") url = await uploadToImgur(cfg, record.blob);
+  else if (cfg.hostId === "r2") url = await uploadToR2(cfg, record.blob, record.name);
   else url = await uploadToGitHub(cfg, record.blob, record.name);
 
   rememberUpload(mediaId, url, cfg.hostId);

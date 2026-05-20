@@ -10,32 +10,13 @@ import {
   AlignRight,
   AlignJustify,
 } from "lucide-react";
-import {
-  getTipTapEditor,
-  getEditorView,
-  activeMode,
-} from "@/lib/editor-ref";
+import { getTipTapEditor } from "@/lib/editor-ref";
 import {
   FONT_SIZE_PRESETS,
   LINE_HEIGHT_PRESETS,
   COLOR_PRESETS,
 } from "@/lib/editor-text-style";
 
-/**
- * Text-styling dropdown — color / font size / line height / alignment.
- *
- * Used in BOTH editor toolbars. Detects the active editor at click time:
- *   - Visual (TipTap): calls the appropriate chain command
- *   - MD (CodeMirror): wraps the selection in `<span style="...">` or
- *     `<div style="...">` so the same effect renders in the preview
- *
- * Platform compatibility:
- *   - WeChat / Blog / X long-form: all styles render (inline CSS preserved
- *     through juice)
- *   - Short-form adapters (小红书 / X Thread / 微博 / 朋友圈): produce
- *     text-based outputs; styles naturally don't apply — same as preview
- *     showing native rendering
- */
 export function StylingMenu() {
   return (
     <Popover.Root>
@@ -61,19 +42,11 @@ export function StylingMenu() {
           <FontSizeSection />
           <LineHeightSection />
           <AlignSection />
-          <p className="text-[10px] text-app-fg-subtle leading-snug pt-1 border-t border-app-border">
-            样式在公众号 / 博客 / X Long-form 中保留;短文平台(小红书 / Thread /
-            微博 / 朋友圈)按各自原生纯文本呈现。
-          </p>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
   );
 }
-
-// =====================================================================
-// Sections
-// =====================================================================
 
 function Section({
   title,
@@ -155,7 +128,11 @@ function LineHeightSection() {
 }
 
 function AlignSection() {
-  const items: { id: "left" | "center" | "right" | "justify"; Icon: React.ComponentType<{ size?: number }>; title: string }[] = [
+  const items: {
+    id: "left" | "center" | "right" | "justify";
+    Icon: React.ComponentType<{ size?: number }>;
+    title: string;
+  }[] = [
     { id: "left", Icon: AlignLeft, title: "左对齐" },
     { id: "center", Icon: AlignCenter, title: "居中" },
     { id: "right", Icon: AlignRight, title: "右对齐" },
@@ -181,91 +158,32 @@ function AlignSection() {
 }
 
 // =====================================================================
-// Dispatch — editor-aware
+// Dispatch — TipTap only
 // =====================================================================
 
 function applyColor(color: string | null) {
-  if (activeMode() === "visual") {
-    const tt = getTipTapEditor();
-    if (!tt) return;
-    if (color) tt.chain().focus().setColor(color).run();
-    else tt.chain().focus().unsetColor().run();
-    return;
-  }
-  if (!color) return; // MD: "default" no-op (user removes span manually / undo)
-  wrapInline(`color:${color}`);
+  const tt = getTipTapEditor();
+  if (!tt) return;
+  if (color) tt.chain().focus().setColor(color).run();
+  else tt.chain().focus().unsetColor().run();
 }
 
 function applyFontSize(size: string | null) {
-  if (activeMode() === "visual") {
-    const tt = getTipTapEditor();
-    if (!tt) return;
-    if (size) tt.chain().focus().setFontSize(size).run();
-    else tt.chain().focus().unsetFontSize().run();
-    return;
-  }
-  if (!size) return;
-  wrapInline(`font-size:${size}`);
+  const tt = getTipTapEditor();
+  if (!tt) return;
+  if (size) tt.chain().focus().setFontSize(size).run();
+  else tt.chain().focus().unsetFontSize().run();
 }
 
 function applyLineHeight(value: string | null) {
-  if (activeMode() === "visual") {
-    const tt = getTipTapEditor();
-    if (!tt) return;
-    if (value) tt.chain().focus().setLineHeight(value).run();
-    else tt.chain().focus().unsetLineHeight().run();
-    return;
-  }
-  if (!value) return;
-  wrapBlock(`line-height:${value}`);
+  const tt = getTipTapEditor();
+  if (!tt) return;
+  if (value) tt.chain().focus().setLineHeight(value).run();
+  else tt.chain().focus().unsetLineHeight().run();
 }
 
 function applyTextAlign(align: "left" | "center" | "right" | "justify") {
-  if (activeMode() === "visual") {
-    const tt = getTipTapEditor();
-    if (!tt) return;
-    tt.chain().focus().setTextAlign(align).run();
-    return;
-  }
-  wrapBlock(`text-align:${align}`);
-}
-
-// =====================================================================
-// CodeMirror helpers — wrap selection in span / div with inline style
-// =====================================================================
-
-function wrapInline(style: string) {
-  const view = getEditorView();
-  if (!view) return;
-  const sel = view.state.selection.main;
-  const selected = sel.empty
-    ? ""
-    : view.state.doc.sliceString(sel.from, sel.to);
-  const left = `<span style="${style}">`;
-  const right = `</span>`;
-  view.dispatch({
-    changes: { from: sel.from, to: sel.to, insert: left + selected + right },
-    selection: { anchor: sel.from + left.length + selected.length },
-  });
-  view.focus();
-}
-
-function wrapBlock(style: string) {
-  const view = getEditorView();
-  if (!view) return;
-  const sel = view.state.selection.main;
-  const doc = view.state.doc;
-  const startLine = doc.lineAt(sel.from);
-  const endLine = doc.lineAt(sel.to);
-  const from = startLine.from;
-  const to = Math.min(endLine.to, doc.length);
-  const block = doc.sliceString(from, to);
-  if (!block.trim()) return; // don't wrap empty lines
-  const left = `<div style="${style}">\n\n`;
-  const right = `\n\n</div>`;
-  view.dispatch({
-    changes: { from, to, insert: left + block + right },
-    selection: { anchor: from + left.length + block.length },
-  });
-  view.focus();
+  const tt = getTipTapEditor();
+  if (!tt) return;
+  tt.chain().focus().setTextAlign(align).run();
 }

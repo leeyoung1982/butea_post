@@ -92,7 +92,11 @@ export function ImageHostPanel() {
       {config && !editing && (
         <div className="text-[11px] text-app-fg-muted">
           ✓ 当前图床：<span className="text-app-fg font-medium">
-            {config.hostId === "imgur" ? "Imgur" : `GitHub · ${config.owner}/${config.repo}`}
+            {config.hostId === "imgur"
+              ? "Imgur"
+              : config.hostId === "r2"
+              ? `R2 · ${config.bucketName}`
+              : `GitHub · ${config.owner}/${config.repo}`}
           </span>
         </div>
       )}
@@ -108,6 +112,8 @@ export function ImageHostPanel() {
               "图床已保存",
               c.hostId === "imgur"
                 ? "Imgur · 匿名上传就绪"
+                : c.hostId === "r2"
+                ? `R2 · ${c.bucketName}`
                 : `GitHub · ${c.owner}/${c.repo}`
             );
           }}
@@ -188,11 +194,39 @@ function HostConfigForm({
   const [ghPath, setGhPath] = React.useState(
     initial?.hostId === "github" ? initial.pathPrefix : "butea-uploads"
   );
+  const [r2AccountId, setR2AccountId] = React.useState(
+    initial?.hostId === "r2" ? initial.accountId : ""
+  );
+  const [r2Bucket, setR2Bucket] = React.useState(
+    initial?.hostId === "r2" ? initial.bucketName : ""
+  );
+  const [r2AccessKey, setR2AccessKey] = React.useState(
+    initial?.hostId === "r2" ? initial.accessKeyId : ""
+  );
+  const [r2SecretKey, setR2SecretKey] = React.useState(
+    initial?.hostId === "r2" ? initial.secretAccessKey : ""
+  );
+  const [r2PublicUrl, setR2PublicUrl] = React.useState(
+    initial?.hostId === "r2" ? initial.publicUrl : ""
+  );
+  const [r2Path, setR2Path] = React.useState(
+    initial?.hostId === "r2" ? initial.pathPrefix : "butea/"
+  );
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (hostId === "imgur") {
       onSave({ hostId: "imgur", clientId: imgurId.trim() });
+    } else if (hostId === "r2") {
+      onSave({
+        hostId: "r2",
+        accountId: r2AccountId.trim(),
+        bucketName: r2Bucket.trim(),
+        accessKeyId: r2AccessKey.trim(),
+        secretAccessKey: r2SecretKey.trim(),
+        publicUrl: r2PublicUrl.trim(),
+        pathPrefix: r2Path.trim() || "butea/",
+      });
     } else {
       onSave({
         hostId: "github",
@@ -209,6 +243,11 @@ function HostConfigForm({
     <form onSubmit={submit} className="space-y-2.5 text-xs">
       <div className="flex gap-1">
         <HostTab
+          active={hostId === "r2"}
+          onClick={() => setHostId("r2")}
+          label="R2"
+        />
+        <HostTab
           active={hostId === "imgur"}
           onClick={() => setHostId("imgur")}
           label="Imgur"
@@ -220,7 +259,66 @@ function HostConfigForm({
         />
       </div>
 
-      {hostId === "imgur" ? (
+      {hostId === "r2" ? (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Account ID">
+              <input
+                value={r2AccountId}
+                onChange={(e) => setR2AccountId(e.target.value)}
+                placeholder="cf-account-id"
+                className="w-full h-7 px-2 rounded border border-app-border bg-app-bg text-xs font-mono focus:outline-none focus:border-app-fg-muted"
+              />
+            </Field>
+            <Field label="Bucket Name">
+              <input
+                value={r2Bucket}
+                onChange={(e) => setR2Bucket(e.target.value)}
+                placeholder="my-images"
+                className="w-full h-7 px-2 rounded border border-app-border bg-app-bg text-xs font-mono focus:outline-none focus:border-app-fg-muted"
+              />
+            </Field>
+          </div>
+          <Field label="Access Key ID">
+            <input
+              value={r2AccessKey}
+              onChange={(e) => setR2AccessKey(e.target.value)}
+              placeholder="R2 API Token Access Key ID"
+              className="w-full h-7 px-2 rounded border border-app-border bg-app-bg text-xs font-mono focus:outline-none focus:border-app-fg-muted"
+            />
+          </Field>
+          <Field label="Secret Access Key">
+            <input
+              type="password"
+              value={r2SecretKey}
+              onChange={(e) => setR2SecretKey(e.target.value)}
+              placeholder="R2 API Token Secret"
+              className="w-full h-7 px-2 rounded border border-app-border bg-app-bg text-xs font-mono focus:outline-none focus:border-app-fg-muted"
+            />
+          </Field>
+          <Field label="Public URL (自定义域名)">
+            <input
+              value={r2PublicUrl}
+              onChange={(e) => setR2PublicUrl(e.target.value)}
+              placeholder="https://img.example.com"
+              className="w-full h-7 px-2 rounded border border-app-border bg-app-bg text-xs font-mono focus:outline-none focus:border-app-fg-muted"
+            />
+          </Field>
+          <Field label="Path prefix">
+            <input
+              value={r2Path}
+              onChange={(e) => setR2Path(e.target.value)}
+              placeholder="butea/"
+              className="w-full h-7 px-2 rounded border border-app-border bg-app-bg text-xs font-mono focus:outline-none focus:border-app-fg-muted"
+            />
+          </Field>
+          <p className="text-[10px] text-app-fg-muted leading-relaxed">
+            在 Cloudflare Dashboard → R2 → Manage R2 API Tokens 创建 Token，
+            需要 Object Read &amp; Write 权限。Public URL 是你给 Bucket 绑定的
+            自定义域名（R2 → Settings → Custom Domains）。
+          </p>
+        </>
+      ) : hostId === "imgur" ? (
         <>
           <Field label="Imgur Client ID">
             <input
