@@ -9,6 +9,7 @@ import {
   Cog,
   Image as ImageIcon,
   BookOpen,
+  PanelLeftClose,
 } from "lucide-react";
 import { VisualEditor } from "@/components/editor/VisualEditor";
 import { Drawer } from "@/components/ui/Drawer";
@@ -36,7 +37,7 @@ export function Workspace() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
 
   const wordCount = markdown.replace(/\s/g, "").length;
-  const firstHeading = markdown.match(/^#\s+(.+)/m)?.[1] ?? "未命名文档";
+  const firstHeading = (markdown.match(/^#\s+(.+)/m)?.[1] ?? "未命名文档").replace(/<[^>]+>/g, "").trim() || "未命名文档";
 
   return (
     <div className="h-screen w-screen flex flex-col bg-app-bg text-app-fg overflow-hidden">
@@ -153,12 +154,19 @@ export function Workspace() {
 
         {/* Side panel */}
         {sidebarPanel && (
-          <aside className="w-[320px] shrink-0 border-r border-app-border bg-app-surface flex flex-col">
+          <aside className="w-[320px] shrink-0 border-r border-app-border bg-app-surface flex flex-col relative">
             {sidebarPanel === "current" && <CurrentDocPanel />}
             {sidebarPanel === "library" && <LibraryPanel />}
             {sidebarPanel === "obsidian" && <ObsidianPanel />}
             {sidebarPanel === "assets" && <AssetsPanel />}
             {sidebarPanel === "publish" && <PublishCenter />}
+            <button
+              onClick={() => setSidebarPanel(null)}
+              className="absolute top-1/2 -right-3 -translate-y-1/2 z-10 w-6 h-6 rounded-full border border-app-border bg-app-surface shadow-sm flex items-center justify-center text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover transition-colors"
+              title="收起面板"
+            >
+              <PanelLeftClose size={12} />
+            </button>
           </aside>
         )}
 

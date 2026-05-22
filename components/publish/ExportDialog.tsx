@@ -93,7 +93,7 @@ export function ExportDialog({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const firstHeading = markdown.match(/^#\s+(.+)/m)?.[1] ?? "draft";
+    const firstHeading = (markdown.match(/^#\s+(.+)/m)?.[1] ?? "draft").replace(/<[^>]+>/g, "").trim() || "draft";
     a.download = `${firstHeading.replace(/[^\w一-龥\s-]/g, "").slice(0, 40)}.${adapter.id}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);

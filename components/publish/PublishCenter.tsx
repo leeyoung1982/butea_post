@@ -127,7 +127,7 @@ export function PublishCenter() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const title = markdown.match(/^#\s+(.+)/m)?.[1] ?? "draft";
+    const title = (markdown.match(/^#\s+(.+)/m)?.[1] ?? "draft").replace(/<[^>]+>/g, "").trim() || "draft";
     a.download = `${title.replace(/[^\w\u4e00-\u9fff\s-]/g, "").slice(0, 40)}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);

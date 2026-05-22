@@ -26,7 +26,7 @@ export function AstroPushSection() {
 
   // Frontmatter fields
   const titleFromDoc = React.useMemo(
-    () => markdown.match(/^#\s+(.+)/m)?.[1]?.trim() ?? "",
+    () => (markdown.match(/^#\s+(.+)/m)?.[1] ?? "").replace(/<[^>]+>/g, "").trim(),
     [markdown]
   );
   const [description, setDescription] = React.useState("");

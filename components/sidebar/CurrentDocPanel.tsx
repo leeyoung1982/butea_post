@@ -268,7 +268,10 @@ function OutlineView() {
       if (line.startsWith("```")) inCode = !inCode;
       if (inCode) return;
       const m = /^(#{1,3})\s+(.+)/.exec(line);
-      if (m) items.push({ level: m[1].length, text: m[2], lineIndex: i });
+      if (m) {
+        const plain = m[2].replace(/<[^>]+>/g, "").trim();
+        if (plain) items.push({ level: m[1].length, text: plain, lineIndex: i });
+      }
     });
     return items;
   }, [markdownValue]);

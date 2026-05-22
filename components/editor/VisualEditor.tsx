@@ -11,6 +11,8 @@ import { Markdown } from "tiptap-markdown";
 import { ResizableImage } from "./ResizableImage";
 import { FontSize, LineHeight } from "@/lib/editor-text-style";
 import { HalfHighlight, HIGHLIGHT_COLORS } from "@/lib/editor-highlight";
+import { AdmonitionDecoration, ADMONITION_TYPES, admonitionEditorCss } from "@/lib/editor-admonition";
+import { CodeBlockChrome, codeBlockChromeCss } from "@/lib/editor-codeblock";
 import {
   Bold,
   Italic,
@@ -69,7 +71,7 @@ export function VisualEditor() {
     [themeId, customThemeTokens]
   );
   const editorCss = React.useMemo(
-    () => buildThemeCss(theme, ".ProseMirror"),
+    () => buildThemeCss(theme, ".ProseMirror") + admonitionEditorCss(".ProseMirror") + codeBlockChromeCss(".ProseMirror"),
     [theme]
   );
 
@@ -91,6 +93,8 @@ export function VisualEditor() {
       FontSize,
       LineHeight,
       HalfHighlight,
+      AdmonitionDecoration,
+      CodeBlockChrome,
       Markdown.configure({
         html: true,
         breaks: true,
@@ -366,14 +370,7 @@ function VisualToolbar({
           <Strikethrough size={12} />
         </T>
         <HeadingDropdown editor={editor} disabled={rawMode} />
-        <T
-          active={editor.isActive("blockquote")}
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          title="引用"
-          disabled={rawMode}
-        >
-          <Quote size={12} />
-        </T>
+        <BlockquoteDropdown editor={editor} disabled={rawMode} />
         <T
           active={editor.isActive("bulletList")}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -390,14 +387,7 @@ function VisualToolbar({
         >
           <ListOrdered size={12} />
         </T>
-        <T
-          active={editor.isActive("code") || editor.isActive("codeBlock")}
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          title="代码块 (⌘E)"
-          disabled={rawMode}
-        >
-          <Code2 size={12} />
-        </T>
+        <CodeBlockDropdown editor={editor} disabled={rawMode} />
 
         {/* Half-height highlight */}
         <HighlightDropdown editor={editor} disabled={rawMode} />
@@ -549,6 +539,294 @@ const HEADING_ITEMS: {
   { label: "H3 三级标题", level: 3, icon: <Heading3 size={12} /> },
   { label: "H4 四级标题", level: 4, icon: <Heading4 size={12} /> },
 ];
+
+/**
+ * Helper: detect current admonition type from the blockquote the cursor is in.
+ * Returns null if not in a blockquote, or "plain" for a plain quote.
+ */
+function detectAdmonitionType(editor: Editor): string | null {
+  const { $from } = editor.state.selection;
+  for (let d = $from.depth; d >= 0; d--) {
+    const node = $from.node(d);
+    if (node.type.name === "blockquote") {
+      const first = node.firstChild;
+      if (first?.type.name === "paragraph") {
+        const m = /^\[!(\w+)\]/.exec(first.textContent);
+        if (m) return m[1].toLowerCase();
+      }
+      return "plain";
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply or replace admonition type on the current block.
+ * - If not in blockquote: wrap in blockquote, prepend [!type]
+ * - If in plain blockquote: prepend [!type]
+ * - If already has [!type]: replace the type token
+ * - If choosing "plain": remove the [!type] token but keep blockquote
+ */
+function applyAdmonition(editor: Editor, type: string | null) {
+  const current = detectAdmonitionType(editor);
+
+  if (current === null) {
+    // Not in a blockquote — wrap first
+    editor.chain().focus().toggleBlockquote().run();
+    if (type) {
+      // Insert token at the start of the first paragraph in the new blockquote
+      const { $from } = editor.state.selection;
+      // Find the paragraph start inside the blockquote
+      for (let d = $from.depth; d >= 0; d--) {
+        if ($from.node(d).type.name === "blockquote") {
+          const paraStart = $from.start(d) + 1; // paragraph open inside blockquote
+          editor.chain().insertContentAt(paraStart, `[!${type}] `).run();
+          break;
+        }
+      }
+    }
+    return;
+  }
+
+  if (type === null) {
+    // Removing admonition — strip the [!type] token if present
+    if (current !== "plain") {
+      stripAdmonitionToken(editor);
+    }
+    // Unwrap blockquote
+    editor.chain().focus().toggleBlockquote().run();
+    return;
+  }
+
+  if (current === "plain") {
+    // Plain blockquote → add token at start
+    const { $from } = editor.state.selection;
+    for (let d = $from.depth; d >= 0; d--) {
+      if ($from.node(d).type.name === "blockquote") {
+        const paraStart = $from.start(d) + 1;
+        editor.chain().insertContentAt(paraStart, `[!${type}] `).run();
+        break;
+      }
+    }
+    return;
+  }
+
+  // Already has a type — replace it
+  replaceAdmonitionToken(editor, type);
+}
+
+function stripAdmonitionToken(editor: Editor) {
+  const { $from } = editor.state.selection;
+  for (let d = $from.depth; d >= 0; d--) {
+    const node = $from.node(d);
+    if (node.type.name === "blockquote") {
+      const first = node.firstChild;
+      if (first?.type.name === "paragraph") {
+        const m = /^\[!\w+\]\s*/.exec(first.textContent);
+        if (m) {
+          const paraStart = $from.start(d) + 1;
+          const { tr } = editor.state;
+          tr.delete(paraStart, paraStart + m[0].length);
+          editor.view.dispatch(tr);
+        }
+      }
+      break;
+    }
+  }
+}
+
+function replaceAdmonitionToken(editor: Editor, newType: string) {
+  const { $from } = editor.state.selection;
+  for (let d = $from.depth; d >= 0; d--) {
+    const node = $from.node(d);
+    if (node.type.name === "blockquote") {
+      const first = node.firstChild;
+      if (first?.type.name === "paragraph") {
+        const m = /^\[!\w+\]/.exec(first.textContent);
+        if (m) {
+          const paraStart = $from.start(d) + 1;
+          const { tr } = editor.state;
+          tr.insertText(`[!${newType}]`, paraStart, paraStart + m[0].length);
+          editor.view.dispatch(tr);
+        }
+      }
+      break;
+    }
+  }
+}
+
+function BlockquoteDropdown({
+  editor,
+  disabled,
+}: {
+  editor: Editor;
+  disabled?: boolean;
+}) {
+  const isInQuote = editor.isActive("blockquote");
+
+  const items = [
+    { key: "plain", label: "引用", icon: <Quote size={12} /> },
+    ...ADMONITION_TYPES.map((a) => ({
+      key: a.type,
+      label: a.label,
+      icon: <span className="text-xs leading-none">{a.icon}</span>,
+    })),
+  ];
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            "flex items-center gap-0.5 px-1.5 py-1 rounded text-xs transition-colors whitespace-nowrap",
+            isInQuote
+              ? "bg-app-surface-hover text-app-fg"
+              : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover",
+            disabled && "opacity-40 cursor-not-allowed"
+          )}
+          title="引用 / 卡片"
+        >
+          <Quote size={12} />
+          <ChevronDown size={8} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          className="z-50 bg-app-surface border border-app-border rounded-lg shadow-xl p-1 animate-fade-in min-w-[140px]"
+        >
+          {items.map((item) => (
+            <Popover.Close key={item.key} asChild>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (item.key === "plain") {
+                    const current = detectAdmonitionType(editor);
+                    if (current === null) {
+                      // Not in blockquote — wrap as plain quote
+                      editor.chain().focus().toggleBlockquote().run();
+                    } else if (current === "plain") {
+                      // Already plain quote — unwrap
+                      editor.chain().focus().toggleBlockquote().run();
+                    } else {
+                      // Has admonition — strip token, keep quote
+                      stripAdmonitionToken(editor);
+                    }
+                  } else {
+                    applyAdmonition(editor, item.key);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-colors",
+                  "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover"
+                )}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            </Popover.Close>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+const CODE_LANGUAGES = [
+  { lang: "", label: "纯文本" },
+  { lang: "javascript", label: "JavaScript" },
+  { lang: "typescript", label: "TypeScript" },
+  { lang: "python", label: "Python" },
+  { lang: "html", label: "HTML" },
+  { lang: "css", label: "CSS" },
+  { lang: "json", label: "JSON" },
+  { lang: "bash", label: "Bash" },
+  { lang: "sql", label: "SQL" },
+  { lang: "markdown", label: "Markdown" },
+  { lang: "yaml", label: "YAML" },
+  { lang: "rust", label: "Rust" },
+  { lang: "go", label: "Go" },
+  { lang: "java", label: "Java" },
+];
+
+function CodeBlockDropdown({
+  editor,
+  disabled,
+}: {
+  editor: Editor;
+  disabled?: boolean;
+}) {
+  const isActive = editor.isActive("codeBlock");
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            "flex items-center gap-0.5 px-1.5 py-1 rounded text-xs transition-colors whitespace-nowrap",
+            isActive
+              ? "bg-app-surface-hover text-app-fg"
+              : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover",
+            disabled && "opacity-40 cursor-not-allowed"
+          )}
+          title="代码块"
+        >
+          <Code2 size={12} />
+          <ChevronDown size={8} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          className="z-50 bg-app-surface border border-app-border rounded-lg shadow-xl p-1 animate-fade-in min-w-[120px] max-h-[280px] overflow-y-auto"
+        >
+          {CODE_LANGUAGES.map((c) => (
+            <Popover.Close key={c.lang} asChild>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (isActive) {
+                    // Update language on existing code block
+                    editor
+                      .chain()
+                      .focus()
+                      .updateAttributes("codeBlock", { language: c.lang })
+                      .run();
+                  } else {
+                    editor
+                      .chain()
+                      .focus()
+                      .toggleCodeBlock()
+                      .updateAttributes("codeBlock", { language: c.lang })
+                      .run();
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-colors",
+                  isActive &&
+                    editor.isActive("codeBlock", { language: c.lang })
+                    ? "bg-app-surface-hover text-app-fg"
+                    : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover"
+                )}
+              >
+                <Code2 size={10} className="opacity-40" />
+                <span>{c.label}</span>
+              </button>
+            </Popover.Close>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
 
 function HeadingDropdown({
   editor,
