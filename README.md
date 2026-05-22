@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/butea-post-logo.png" alt="Butea Post" width="180" />
+  <img src="public/butea-post-logo.png" alt="Butea Post" width="90" />
 </p>
 
 <h1 align="center">Butea Post</h1>
