@@ -21,7 +21,6 @@ import {
   hashMarkdown,
   MissingLLMKeyError,
 } from "@/lib/llm/translate";
-import { ThemePicker } from "@/components/themes/ThemePicker";
 import { ImageHostPanel } from "@/components/publish/ImageHostPanel";
 import { AstroPushSection } from "@/components/publish/AstroPushSection";
 import { Button } from "@/components/ui/Button";
@@ -54,7 +53,11 @@ export function PublishCenter() {
   const audience = useWorkshop((s) => s.audience);
   const setAiOpen = useWorkshop((s) => s.setAiOpen);
 
-  const theme = getTheme(themeId);
+  const customThemeTokens = useWorkshop((s) => s.customThemeTokens);
+  const theme = React.useMemo(
+    () => getTheme(themeId, customThemeTokens ?? undefined),
+    [themeId, customThemeTokens]
+  );
   const adapter = getAdapter(currentPlatform);
   const sourceHash = React.useMemo(() => hashMarkdown(markdown), [markdown]);
   const currentTranslation = translations[currentPlatform];
@@ -204,14 +207,6 @@ export function PublishCenter() {
           })}
         </div>
       </div>
-
-      {/* Theme (for long-form platforms) */}
-      {!adapter.requiresRewrite && (
-        <div className="px-3 py-2 border-b border-app-border flex items-center justify-between">
-          <span className="text-[11px] text-app-fg-muted">排版主题</span>
-          <ThemePicker />
-        </div>
-      )}
 
       {/* AI adapt controls (for short-form platforms) */}
       {adapter.requiresRewrite && (

@@ -24,7 +24,11 @@ export function ExportDialog({
   const audience = useWorkshop((s) => s.audience);
   const translations = useWorkshop((s) => s.translations);
   const useTranslation = useWorkshop((s) => s.useTranslation);
-  const theme = getTheme(themeId);
+  const customThemeTokens = useWorkshop((s) => s.customThemeTokens);
+  const theme = React.useMemo(
+    () => getTheme(themeId, customThemeTokens ?? undefined),
+    [themeId, customThemeTokens]
+  );
   const adapter = getAdapter(platformId);
 
   // Mirror Preview's logic: export the user's currently-chosen version.

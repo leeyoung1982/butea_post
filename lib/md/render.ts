@@ -6,13 +6,13 @@ import remarkRehype from "remark-rehype";
 import rehypeRaw from "rehype-raw";
 import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
-import type { ArticleTheme } from "@/lib/themes/themes";
+import { BG_TEXTURES, type ArticleTheme } from "@/lib/themes/themes";
 import { resolveMediaInMarkdown } from "@/lib/media/store";
 
 /**
  * Render markdown to HTML. Returns the inner HTML (without the root wrapper)
  * and the theme CSS string. The caller can:
- *   - Inject CSS into a <style> tag and wrap the HTML in a `.preview-root` div for live preview
+ *   - Inject CSS into a <style> tag and wrap the HTML in a `${R}` div for live preview
  *   - Or pass both to inlineForWeChat() to get a paste-ready WeChat HTML string
  */
 export async function renderMarkdown(
@@ -228,12 +228,18 @@ function applyHeadingFlair(html: string, theme: ArticleTheme): string {
 }
 
 /**
- * Build a CSS string with selectors scoped to `.preview-root`. The selectors
+ * Build a CSS string with selectors scoped to `${R}`. The selectors
  * are intentionally simple (single class or tag selectors) so juice can inline
  * them onto every matching element when exporting.
  */
-export function buildThemeCss(theme: ArticleTheme): string {
+/**
+ * Build a CSS string with selectors scoped to a root class. Defaults to
+ * `${R}` for publish preview; pass `.ProseMirror` for the live
+ * editor theme.
+ */
+export function buildThemeCss(theme: ArticleTheme, rootSelector = "${R}"): string {
   const t = theme.tokens;
+  const R = rootSelector;
 
   const h1Flair = (() => {
     switch (t.h1Style) {
@@ -263,10 +269,16 @@ export function buildThemeCss(theme: ArticleTheme): string {
     }
   })();
 
+  const textureCss = t.bgTexture
+    ? BG_TEXTURES.find((bt) => bt.id === t.bgTexture)?.css ?? ""
+    : "";
+
   return `
-.preview-root {
+${R} {
   background: ${t.bg};
+  ${textureCss}
   color: ${t.fg};
+  caret-color: ${t.fg};
   font-family: ${t.fontBody};
   font-size: ${t.bodySize};
   line-height: ${t.lineHeight};
@@ -274,7 +286,10 @@ export function buildThemeCss(theme: ArticleTheme): string {
   max-width: 100%;
   word-wrap: break-word;
 }
-.preview-root h1 {
+${R}::selection {
+  background: ${t.accent}30;
+}
+${R} h1 {
   font-family: ${t.fontTitle};
   font-size: 1.7em;
   font-weight: 700;
@@ -283,7 +298,7 @@ export function buildThemeCss(theme: ArticleTheme): string {
   line-height: 1.4;
   ${h1Flair}
 }
-.preview-root h2 {
+${R} h2 {
   font-family: ${t.fontTitle};
   font-size: 1.35em;
   font-weight: 700;
@@ -292,7 +307,7 @@ export function buildThemeCss(theme: ArticleTheme): string {
   line-height: 1.4;
   ${h2Flair}
 }
-.preview-root h2 .h2-number {
+${R} h2 .h2-number {
   display: inline-block;
   margin-right: 10px;
   color: ${t.accent};
@@ -301,39 +316,39 @@ export function buildThemeCss(theme: ArticleTheme): string {
   font-size: 0.85em;
   letter-spacing: 0.05em;
 }
-.preview-root h3 {
+${R} h3 {
   font-family: ${t.fontTitle};
   font-size: 1.12em;
   font-weight: 600;
   color: ${t.h3Color};
   margin: 1.4em 0 0.6em;
 }
-.preview-root h4,
-.preview-root h5,
-.preview-root h6 {
+${R} h4,
+${R} h5,
+${R} h6 {
   font-family: ${t.fontTitle};
   font-weight: 600;
   color: ${t.fg};
   margin: 1.2em 0 0.5em;
 }
-.preview-root p {
+${R} p {
   margin: 0 0 ${t.paragraphSpacing};
   line-height: ${t.lineHeight};
   letter-spacing: 0.02em;
 }
-.preview-root a {
+${R} a {
   color: ${t.linkColor};
   text-decoration: none;
   border-bottom: 1px solid ${t.linkColor}40;
 }
-.preview-root strong {
+${R} strong {
   color: ${t.fg};
   font-weight: 700;
 }
-.preview-root em {
+${R} em {
   font-style: italic;
 }
-.preview-root blockquote {
+${R} blockquote {
   margin: 1.4em 0;
   padding: 14px 18px;
   background: ${t.quoteBg};
@@ -342,31 +357,31 @@ export function buildThemeCss(theme: ArticleTheme): string {
   border-radius: 0 4px 4px 0;
   font-size: 0.95em;
 }
-.preview-root blockquote p {
+${R} blockquote p {
   margin: 0;
 }
-.preview-root blockquote p + p {
+${R} blockquote p + p {
   margin-top: 0.6em;
 }
-.preview-root ul,
-.preview-root ol {
+${R} ul,
+${R} ol {
   margin: 0 0 ${t.paragraphSpacing};
   padding-left: 1.5em;
   line-height: ${t.lineHeight};
 }
-.preview-root li {
+${R} li {
   margin: 0.4em 0;
 }
-.preview-root li > p {
+${R} li > p {
   margin: 0;
 }
-.preview-root hr {
+${R} hr {
   height: 1px;
   border: none;
   background: ${t.border};
   margin: 2em 0;
 }
-.preview-root code {
+${R} code {
   background: ${t.codeInlineBg};
   color: ${t.codeInlineFg};
   padding: 0.15em 0.4em;
@@ -374,7 +389,7 @@ export function buildThemeCss(theme: ArticleTheme): string {
   font-family: ${t.fontCode};
   font-size: 0.9em;
 }
-.preview-root pre {
+${R} pre {
   background: ${t.codeBg};
   color: ${t.codeFg};
   padding: 16px 18px;
@@ -384,20 +399,20 @@ export function buildThemeCss(theme: ArticleTheme): string {
   font-size: 0.9em;
   line-height: 1.6;
 }
-.preview-root pre code {
+${R} pre code {
   background: transparent;
   color: inherit;
   padding: 0;
   border-radius: 0;
   font-size: 1em;
 }
-.preview-root table {
+${R} table {
   width: 100%;
   border-collapse: collapse;
   margin: 1.4em 0;
   font-size: 0.92em;
 }
-.preview-root th {
+${R} th {
   background: ${t.tableHeaderBg};
   color: ${t.fg};
   padding: 10px 12px;
@@ -405,11 +420,11 @@ export function buildThemeCss(theme: ArticleTheme): string {
   font-weight: 600;
   text-align: left;
 }
-.preview-root td {
+${R} td {
   padding: 10px 12px;
   border: 1px solid ${t.tableBorder};
 }
-.preview-root img {
+${R} img {
   max-width: 100%;
   height: auto;
   margin: 1em 0;

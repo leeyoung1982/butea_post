@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ThemeId } from "@/lib/themes/themes";
+import type { ThemeId, ThemeTokens } from "@/lib/themes/themes";
 import type { PlatformId } from "@/lib/adapters/types";
 
 export const DEFAULT_MARKDOWN = `# Butea Studio
@@ -28,6 +28,9 @@ export type DocumentState = {
 
   themeId: ThemeId;
   setThemeId: (id: ThemeId) => void;
+
+  customThemeTokens: ThemeTokens | null;
+  setCustomThemeTokens: (tokens: ThemeTokens) => void;
 
   // Which platform the publish center targets.
   currentPlatform: PlatformId;
@@ -96,6 +99,9 @@ export const useWorkshop = create<DocumentState>()(
         if (get().themeId === id) return;
         set({ themeId: id });
       },
+
+      customThemeTokens: null,
+      setCustomThemeTokens: (tokens) => set({ customThemeTokens: tokens }),
 
       currentPlatform: "wechat",
       setCurrentPlatform: (p) => {
@@ -195,6 +201,7 @@ export const useWorkshop = create<DocumentState>()(
       partialize: (s) => ({
         markdown: s.markdown,
         themeId: s.themeId,
+        customThemeTokens: s.customThemeTokens,
         currentPlatform: s.currentPlatform,
         translations: s.translations,
         useTranslation: s.useTranslation,

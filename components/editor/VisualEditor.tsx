@@ -10,6 +10,7 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import { Markdown } from "tiptap-markdown";
 import { ResizableImage } from "./ResizableImage";
 import { FontSize, LineHeight } from "@/lib/editor-text-style";
+import { HalfHighlight, HIGHLIGHT_COLORS } from "@/lib/editor-highlight";
 import {
   Bold,
   Italic,
@@ -28,8 +29,12 @@ import {
   Upload,
   Globe,
   ChevronDown,
+  Highlighter,
+  FileCode2,
 } from "lucide-react";
 import { useWorkshop } from "@/lib/store";
+import { getTheme } from "@/lib/themes/themes";
+import { buildThemeCss } from "@/lib/md/render";
 import { resolveMediaInMarkdown } from "@/lib/media/store";
 import { imageMarkdown } from "@/lib/llm/image";
 import { setTipTapEditor, insertAtCursor } from "@/lib/editor-ref";
@@ -40,26 +45,33 @@ import { LinkCardDialog } from "./dialogs/LinkCardDialog";
 import { PasteImageUrlDialog } from "./dialogs/PasteImageUrlDialog";
 import { AIInlineMenu } from "./AIInlineMenu";
 import { StylingMenu } from "./StylingMenu";
+import { ThemePicker } from "@/components/themes/ThemePicker";
 import * as Popover from "@radix-ui/react-popover";
 
-/**
- * Visual / WYSIWYG editor mode. TipTap + tiptap-markdown so we round-trip
- * cleanly to/from the same markdown source the source-mode editor uses.
- *
- * Capabilities:
- *   - Full formatting toolbar (TipTap commands, not CodeMirror dispatch)
- *   - butea-media:// images render as blob URLs (resolved before mount)
- *   - Drag-drop image upload
- *
- * Caveats:
- *   - Frontmatter (---yaml---) not parsed
- *   - Custom HTML blocks (link cards, video embeds) survive as raw HTML
- *     but aren't richly editable
- *   - Complex tables render plainly; use MD mode for table-heavy edits
- */
 export function VisualEditor() {
   const markdownValue = useWorkshop((s) => s.markdown);
   const setMarkdown = useWorkshop((s) => s.setMarkdown);
+  const themeId = useWorkshop((s) => s.themeId);
+  const customThemeTokens = useWorkshop((s) => s.customThemeTokens);
+
+  // Raw markdown mode toggle
+  const [rawMode, setRawMode] = React.useState(false);
+
+  // Build theme CSS targeting the TipTap editor's .ProseMirror container.
+  // Memoize on stable primitives (themeId) and reference (customThemeTokens)
+  // to avoid rebuilding CSS on every render.
+  const theme = React.useMemo(
+    () => getTheme(themeId, customThemeTokens ?? undefined),
+    [themeId, customThemeTokens]
+  );
+  const editorCss = React.useMemo(
+    () => buildThemeCss(theme, ".ProseMirror"),
+    [theme]
+  );
+
+  // Guard against sync loops: when we programmatically setContent,
+  // TipTap may fire onUpdate — this ref tells onUpdate to ignore it.
+  const suppressUpdateRef = React.useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -74,6 +86,7 @@ export function VisualEditor() {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       FontSize,
       LineHeight,
+      HalfHighlight,
       Markdown.configure({
         html: true,
         breaks: true,
@@ -83,6 +96,7 @@ export function VisualEditor() {
     ],
     content: markdownValue,
     onUpdate: ({ editor }) => {
+      if (suppressUpdateRef.current) return;
       const storage = editor.storage as unknown as {
         markdown?: { getMarkdown?: () => string };
       };
@@ -91,14 +105,9 @@ export function VisualEditor() {
     },
     editorProps: {
       attributes: {
-        class:
-          "prose prose-sm max-w-none focus:outline-none px-8 py-6 min-h-full",
+        class: "max-w-none focus:outline-none min-h-full",
       },
-      // Two drop sources:
-      //   1. AssetsPanel asset drag (application/x-butea-media MIME)
-      //   2. OS file drop (image files)
       handleDrop: (view, event) => {
-        // (1) Asset drag
         const mediaId = event.dataTransfer?.getData("application/x-butea-media");
         if (mediaId) {
           event.preventDefault();
@@ -127,7 +136,6 @@ export function VisualEditor() {
           return true;
         }
 
-        // (2) OS file drop
         const files = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
           f.type.startsWith("image/")
         );
@@ -135,8 +143,6 @@ export function VisualEditor() {
         event.preventDefault();
         (async () => {
           try {
-            // Resolve all in parallel (IDB writes are independent); insert
-            // sequentially to preserve drop order
             const resolved = await Promise.all(
               files.map(async (file) => {
                 const md = await imageMarkdown(
@@ -167,9 +173,6 @@ export function VisualEditor() {
     },
   });
 
-  // Register the TipTap editor as the active editor so toolbars, dialogs,
-  // and AI flows can dispatch into either CM or TipTap without knowing
-  // which mode is mounted.
   React.useEffect(() => {
     setTipTapEditor(editor ?? null);
     return () => {
@@ -177,37 +180,99 @@ export function VisualEditor() {
     };
   }, [editor]);
 
-  // Sync external markdown changes (AI generation, doc switch, paste from
-  // another source) back into the TipTap doc. Resolve butea-media:// to
-  // blob URLs FIRST so images actually render.
+  // Sync external markdown changes into TipTap
   React.useEffect(() => {
-    if (!editor) return;
+    if (!editor || rawMode) return;
     const storage = editor.storage as unknown as {
       markdown?: { getMarkdown?: () => string };
     };
     const current = storage.markdown?.getMarkdown?.() ?? "";
     if (current.trim() === markdownValue.trim()) return;
 
-    // Cancellation guard — if the user types fast, an older resolveMedia
-    // promise must not clobber the newer markdown after a re-fire of this
-    // effect, or after the component unmounts during mode toggle.
     let cancelled = false;
     (async () => {
       const resolved = await resolveMediaInMarkdown(markdownValue);
       if (cancelled) return;
+      suppressUpdateRef.current = true;
       editor.commands.setContent(resolved, { emitUpdate: false });
+      // Release guard on next microtask so user edits are not suppressed
+      queueMicrotask(() => {
+        suppressUpdateRef.current = false;
+      });
     })();
     return () => {
       cancelled = true;
     };
+  }, [editor, markdownValue, rawMode]);
+
+  // When switching back from raw mode, re-sync editor content
+  const handleExitRawMode = React.useCallback(() => {
+    setRawMode(false);
+    if (editor) {
+      (async () => {
+        const resolved = await resolveMediaInMarkdown(markdownValue);
+        suppressUpdateRef.current = true;
+        editor.commands.setContent(resolved, { emitUpdate: false });
+        queueMicrotask(() => {
+          suppressUpdateRef.current = false;
+        });
+      })();
+    }
   }, [editor, markdownValue]);
 
   return (
-    <div className="h-full w-full flex flex-col bg-app-surface">
-      <VisualToolbar editor={editor} />
-      <div className="flex-1 overflow-auto">
-        <EditorContent editor={editor} className="h-full" />
-      </div>
+    <div className="h-full w-full flex flex-col">
+      <style dangerouslySetInnerHTML={{ __html: editorCss }} />
+      <VisualToolbar
+        editor={editor}
+        rawMode={rawMode}
+        onToggleRaw={() => (rawMode ? handleExitRawMode() : setRawMode(true))}
+      />
+      {rawMode ? (
+        <RawMarkdownEditor
+          value={markdownValue}
+          onChange={setMarkdown}
+          theme={theme}
+        />
+      ) : (
+        <div
+          className="flex-1 overflow-auto"
+          style={{ background: theme.tokens.bg }}
+        >
+          <EditorContent editor={editor} className="h-full" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ====================================================================
+// Raw Markdown editor (plain textarea)
+// ====================================================================
+
+function RawMarkdownEditor({
+  value,
+  onChange,
+  theme,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  theme: ReturnType<typeof getTheme>;
+}) {
+  return (
+    <div className="flex-1 overflow-auto bg-[#1e1e1e]">
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        className="w-full h-full resize-none focus:outline-none p-8 font-mono text-sm leading-relaxed"
+        style={{
+          background: "#1e1e1e",
+          color: "#d4d4d4",
+          caretColor: "#d4d4d4",
+          tabSize: 2,
+        }}
+      />
     </div>
   );
 }
@@ -216,10 +281,15 @@ export function VisualEditor() {
 // Toolbar
 // ====================================================================
 
-function VisualToolbar({ editor }: { editor: Editor | null }) {
-  // Re-render only on selection change — toolbar active states are
-  // selection-dependent. Subscribing to `transaction` would re-render on
-  // every keystroke (very frequent) without changing any active state.
+function VisualToolbar({
+  editor,
+  rawMode,
+  onToggleRaw,
+}: {
+  editor: Editor | null;
+  rawMode: boolean;
+  onToggleRaw: () => void;
+}) {
   const [, forceRender] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => {
     if (!editor) return;
@@ -230,7 +300,6 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
     };
   }, [editor]);
 
-  // Local dialog state for the media buttons — same shape as MD-mode toolbar
   const [videoOpen, setVideoOpen] = React.useState(false);
   const [linkOpen, setLinkOpen] = React.useState(false);
   const [pasteUrlOpen, setPasteUrlOpen] = React.useState(false);
@@ -272,6 +341,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("bold")}
           onClick={() => editor.chain().focus().toggleBold().run()}
           title="加粗 (⌘B)"
+          disabled={rawMode}
         >
           <Bold size={12} />
         </T>
@@ -279,6 +349,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("italic")}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           title="斜体 (⌘I)"
+          disabled={rawMode}
         >
           <Italic size={12} />
         </T>
@@ -286,6 +357,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("strike")}
           onClick={() => editor.chain().focus().toggleStrike().run()}
           title="删除线"
+          disabled={rawMode}
         >
           <Strikethrough size={12} />
         </T>
@@ -293,6 +365,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("heading", { level: 2 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           title="二级标题"
+          disabled={rawMode}
         >
           <Heading2 size={12} />
         </T>
@@ -300,6 +373,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("blockquote")}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           title="引用"
+          disabled={rawMode}
         >
           <Quote size={12} />
         </T>
@@ -307,6 +381,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("bulletList")}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           title="无序列表"
+          disabled={rawMode}
         >
           <List size={12} />
         </T>
@@ -314,6 +389,7 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("orderedList")}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           title="有序列表"
+          disabled={rawMode}
         >
           <ListOrdered size={12} />
         </T>
@@ -321,18 +397,25 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
           active={editor.isActive("code") || editor.isActive("codeBlock")}
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           title="代码块 (⌘E)"
+          disabled={rawMode}
         >
           <Code2 size={12} />
         </T>
+
+        {/* Half-height highlight */}
+        <HighlightDropdown editor={editor} disabled={rawMode} />
 
         <Divider />
 
         {/* Text styling — color / size / line-height / alignment */}
         <StylingMenu />
 
+        {/* Article theme — color / style / custom */}
+        <ThemePicker />
+
         <Divider />
 
-        {/* Image dropdown — same shape as MD toolbar */}
+        {/* Image dropdown */}
         <Popover.Root>
           <Popover.Trigger asChild>
             <button
@@ -386,39 +469,54 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
-        <T onClick={() => setVideoOpen(true)} title="嵌入视频">
+        <T onClick={() => setVideoOpen(true)} title="嵌入视频" disabled={rawMode}>
           <Video size={12} />
           <span className="hidden md:inline ml-1">视频</span>
         </T>
-        <T onClick={() => setLinkOpen(true)} title="外链卡片">
+        <T onClick={() => setLinkOpen(true)} title="外链卡片" disabled={rawMode}>
           <LinkIcon size={12} />
           <span className="hidden md:inline ml-1">链接</span>
         </T>
         <T
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
           title="分割线"
+          disabled={rawMode}
         >
           <Minus size={12} />
         </T>
 
         <Divider />
 
-        {/* Unified AI menu — uses editor-ref's editor-agnostic ops */}
+        {/* Unified AI menu */}
         <AIInlineMenu />
 
         <div className="flex-1" />
 
+        {/* Raw markdown toggle */}
+        <T
+          active={rawMode}
+          onClick={onToggleRaw}
+          title={rawMode ? "返回富文本编辑" : "查看 Markdown 源码"}
+        >
+          <FileCode2 size={12} />
+          <span className="hidden md:inline ml-0.5">
+            {rawMode ? "富文本" : "源码"}
+          </span>
+        </T>
+
+        <Divider />
+
         <T
           onClick={() => editor.chain().focus().undo().run()}
           title="撤销 (⌘Z)"
-          disabled={!editor.can().undo()}
+          disabled={!editor.can().undo() || rawMode}
         >
           <Undo2 size={12} />
         </T>
         <T
           onClick={() => editor.chain().focus().redo().run()}
           title="重做 (⌘⇧Z)"
-          disabled={!editor.can().redo()}
+          disabled={!editor.can().redo() || rawMode}
         >
           <Redo2 size={12} />
         </T>
@@ -436,6 +534,77 @@ function VisualToolbar({ editor }: { editor: Editor | null }) {
       <LinkCardDialog open={linkOpen} onOpenChange={setLinkOpen} />
       <PasteImageUrlDialog open={pasteUrlOpen} onOpenChange={setPasteUrlOpen} />
     </>
+  );
+}
+
+// ====================================================================
+// Highlight dropdown
+// ====================================================================
+
+function HighlightDropdown({
+  editor,
+  disabled,
+}: {
+  editor: Editor;
+  disabled?: boolean;
+}) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            "flex items-center gap-0.5 px-1.5 py-1 rounded text-xs transition-colors whitespace-nowrap",
+            editor.isActive("halfHighlight")
+              ? "bg-app-surface-hover text-app-fg"
+              : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover",
+            disabled && "opacity-40 cursor-not-allowed"
+          )}
+          title="荧光笔标注"
+        >
+          <Highlighter size={12} />
+          <ChevronDown size={8} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          className="z-50 bg-app-surface border border-app-border rounded-lg shadow-xl p-2 animate-fade-in"
+        >
+          <div className="text-[10px] text-app-fg-subtle mb-1.5">荧光笔颜色</div>
+          <div className="flex gap-1">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <Popover.Close key={c.value} asChild>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() =>
+                    editor.chain().focus().toggleHalfHighlight(c.value).run()
+                  }
+                  title={c.label}
+                  className="w-6 h-6 rounded border border-app-border hover:scale-110 transition-transform"
+                  style={{
+                    background: `linear-gradient(transparent 60%, ${c.value} 60%)`,
+                  }}
+                />
+              </Popover.Close>
+            ))}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() =>
+                editor.chain().focus().unsetHalfHighlight().run()
+              }
+              title="清除标注"
+              className="w-6 h-6 rounded border border-app-border hover:scale-110 transition-transform flex items-center justify-center text-[9px] text-app-fg-muted"
+            >
+              清
+            </button>
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
