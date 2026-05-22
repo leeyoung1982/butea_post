@@ -75,6 +75,8 @@ export function DocSync() {
   const setMarkdown = useWorkshop((s) => s.setMarkdown);
   const translations = useWorkshop((s) => s.translations);
   const useTranslation = useWorkshop((s) => s.useTranslation);
+  const themeId = useWorkshop((s) => s.themeId);
+  const customThemeTokens = useWorkshop((s) => s.customThemeTokens);
   const setSaveStatus = useWorkshop((s) => s.setSaveStatus);
   const bumpDocList = useWorkshop((s) => s.bumpDocList);
 
@@ -127,7 +129,10 @@ export function DocSync() {
           saveLock.current = false;
           return;
         }
-        // activeDocId points to a deleted doc — fall through to fresh seed
+        // activeDocId points to a deleted/missing doc — clear stale refs
+        // so the seed path below can run cleanly.
+        setActiveDocId(null);
+        setMarkdown(DEFAULT_MARKDOWN);
       }
 
       // No active doc yet. Either first run, or post-v3 migration. Try to
@@ -161,7 +166,7 @@ export function DocSync() {
         lastLoadedRef.current = doc.id;
         bumpDocList();
       } else {
-        // First-time install — seed all 8 starter docs. Order them so
+        // First-time install — seed starter docs. Order them so
         // doc #1 sits at the top (newest updatedAt).
         const baseTime = Date.now();
         const total = STARTER_DOCS.length;
@@ -175,6 +180,8 @@ export function DocSync() {
             markdown: entry.markdown,
             source: { kind: "local" },
           });
+          doc.themeId = entry.themeId ?? "butea";
+          doc.customThemeTokens = entry.customThemeTokens ?? null;
           // Backdate older entries so the first one stays freshest
           doc.createdAt = baseTime + offset;
           doc.updatedAt = baseTime + offset;
@@ -238,6 +245,8 @@ export function DocSync() {
       doc.title = activeDocTitle || extractTitle(markdown) || "未命名文档";
       doc.translations = translations;
       doc.useTranslation = useTranslation;
+      doc.themeId = themeId;
+      doc.customThemeTokens = customThemeTokens;
       doc.updatedAt = Date.now();
       setSaveStatus("saving");
       await putDocument(doc);
@@ -248,7 +257,7 @@ export function DocSync() {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markdown, activeDocTitle, translations, useTranslation, activeDocId]);
+  }, [markdown, activeDocTitle, translations, useTranslation, themeId, customThemeTokens, activeDocId]);
 
   // Silence "dirtyMark" unused-warning while keeping it subscribed so the
   // component re-renders whenever saveStatus changes (lets you read save
@@ -269,10 +278,12 @@ function applyDocToStore(
   // Bypass store-level equality guard by reading/writing directly when needed.
   ctx.setMarkdown(doc.markdown);
   ctx.setActiveDocTitle(doc.title);
-  // Translations / useTranslation are stored on the doc; restore them.
+  // Per-doc state: translations, theme, etc.
   ctx.useWorkshop.setState({
     translations: doc.translations ?? {},
     useTranslation: doc.useTranslation ?? {},
+    themeId: doc.themeId ?? "butea",
+    customThemeTokens: doc.customThemeTokens ?? null,
     saveStatus: "saved",
   });
 }

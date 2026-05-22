@@ -200,8 +200,6 @@ export const useWorkshop = create<DocumentState>()(
       },
       partialize: (s) => ({
         markdown: s.markdown,
-        themeId: s.themeId,
-        customThemeTokens: s.customThemeTokens,
         currentPlatform: s.currentPlatform,
         translations: s.translations,
         useTranslation: s.useTranslation,

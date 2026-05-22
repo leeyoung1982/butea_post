@@ -1,5 +1,6 @@
 import type { PlatformId } from "@/lib/adapters/types";
 import type { TranslationCache } from "@/lib/store";
+import type { ThemeId, ThemeTokens } from "@/lib/themes/themes";
 
 /**
  * Where a document originated. Local docs live in Butea's IndexedDB.
@@ -32,6 +33,9 @@ export type ButeaDocument = {
    *  doesn't show another doc's translations. */
   translations?: Partial<Record<PlatformId, TranslationCache>>;
   useTranslation?: Partial<Record<PlatformId, boolean>>;
+  /** Per-doc theme. Falls back to "butea" if absent. */
+  themeId?: ThemeId;
+  customThemeTokens?: ThemeTokens | null;
 };
 
 export type TrashedDocument = ButeaDocument & {
