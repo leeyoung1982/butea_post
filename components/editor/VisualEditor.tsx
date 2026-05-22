@@ -14,7 +14,11 @@ import { HalfHighlight, HIGHLIGHT_COLORS } from "@/lib/editor-highlight";
 import {
   Bold,
   Italic,
+  Heading1,
   Heading2,
+  Heading3,
+  Heading4,
+  Pilcrow,
   Quote,
   List,
   ListOrdered,
@@ -361,14 +365,7 @@ function VisualToolbar({
         >
           <Strikethrough size={12} />
         </T>
-        <T
-          active={editor.isActive("heading", { level: 2 })}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          title="二级标题"
-          disabled={rawMode}
-        >
-          <Heading2 size={12} />
-        </T>
+        <HeadingDropdown editor={editor} disabled={rawMode} />
         <T
           active={editor.isActive("blockquote")}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -540,6 +537,91 @@ function VisualToolbar({
 // ====================================================================
 // Highlight dropdown
 // ====================================================================
+
+const HEADING_ITEMS: {
+  label: string;
+  level: number | null;
+  icon: React.ReactNode;
+}[] = [
+  { label: "正文", level: null, icon: <Pilcrow size={12} /> },
+  { label: "H1 一级标题", level: 1, icon: <Heading1 size={12} /> },
+  { label: "H2 二级标题", level: 2, icon: <Heading2 size={12} /> },
+  { label: "H3 三级标题", level: 3, icon: <Heading3 size={12} /> },
+  { label: "H4 四级标题", level: 4, icon: <Heading4 size={12} /> },
+];
+
+function HeadingDropdown({
+  editor,
+  disabled,
+}: {
+  editor: Editor;
+  disabled?: boolean;
+}) {
+  const activeItem =
+    HEADING_ITEMS.find(
+      (h) => h.level !== null && editor.isActive("heading", { level: h.level })
+    ) ?? HEADING_ITEMS[0];
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            "flex items-center gap-0.5 px-1.5 py-1 rounded text-xs transition-colors whitespace-nowrap",
+            activeItem.level !== null
+              ? "bg-app-surface-hover text-app-fg"
+              : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover",
+            disabled && "opacity-40 cursor-not-allowed"
+          )}
+          title="标题层级"
+        >
+          {activeItem.icon}
+          <ChevronDown size={8} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          className="z-50 bg-app-surface border border-app-border rounded-lg shadow-xl p-1 animate-fade-in min-w-[120px]"
+        >
+          {HEADING_ITEMS.map((h) => (
+            <Popover.Close key={h.label} asChild>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (h.level === null) {
+                    editor.chain().focus().setParagraph().run();
+                  } else {
+                    editor
+                      .chain()
+                      .focus()
+                      .toggleHeading({ level: h.level as 1 | 2 | 3 | 4 })
+                      .run();
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-colors",
+                  (h.level === null && !editor.isActive("heading"))
+                    ? "bg-app-surface-hover text-app-fg"
+                    : h.level !== null && editor.isActive("heading", { level: h.level })
+                    ? "bg-app-surface-hover text-app-fg"
+                    : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover"
+                )}
+              >
+                {h.icon}
+                {h.label}
+              </button>
+            </Popover.Close>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
 
 function HighlightDropdown({
   editor,
