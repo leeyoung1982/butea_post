@@ -184,7 +184,7 @@ function InspireView() {
   const audience = useWorkshop((s) => s.audience);
   const setAudience = useWorkshop((s) => s.setAudience);
   const setMarkdown = useWorkshop((s) => s.setMarkdown);
-  const setAiOpen = useWorkshop((s) => s.setAiOpen);
+  const setSidebarPanel = useWorkshop((s) => s.setSidebarPanel);
   const [template, setTemplate] = React.useState("PAS");
   const [extra, setExtra] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -197,8 +197,8 @@ function InspireView() {
     setResult("");
     const settings = loadSettings();
     if (!settings?.apiKey) {
-      setError("请先在 AI 副驾驶里配置 LLM key");
-      setAiOpen(true);
+      setError("请先在 AI 写作助手里配置 LLM key");
+      setSidebarPanel("ai");
       return;
     }
     if (!topic.trim()) {
@@ -372,7 +372,7 @@ function ManualView() {
     <div className="p-3 space-y-2 text-xs">
       <div className="text-[11px] text-app-fg-muted leading-relaxed">
         在下方用 Markdown 写大纲（#=标题、##=小节、-=要点）。写好点
-        「应用到正文」，大纲会成为编辑器的初始稿，再用 AI 副驾驶逐节扩写。
+        「应用到正文」，大纲会成为编辑器的初始稿，再用 AI 写作助手逐节扩写。
       </div>
       <textarea
         value={text}

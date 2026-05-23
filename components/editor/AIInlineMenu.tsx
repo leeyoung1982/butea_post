@@ -229,7 +229,7 @@ function AIInlineDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const action = ACTIONS.find((a) => a.id === actionId)!;
-  const setAiOpen = useWorkshop((s) => s.setAiOpen);
+  const setSidebarPanel = useWorkshop((s) => s.setSidebarPanel);
   const draft = useWorkshop((s) => s.markdown);
 
   // Snapshot the editor's selection at mount time. The user may click around
@@ -257,8 +257,8 @@ function AIInlineDialog({
     setOutput("");
     const settings = loadSettings();
     if (!settings?.apiKey) {
-      setError("请先在设置或 AI 副驾驶里配置 LLM key");
-      setAiOpen(true);
+      setError("请先在设置或 AI 写作助手里配置 LLM key");
+      setSidebarPanel("ai");
       return;
     }
     setBusy(true);

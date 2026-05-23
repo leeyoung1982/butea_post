@@ -12,7 +12,6 @@ import {
   PanelLeftClose,
 } from "lucide-react";
 import { VisualEditor } from "@/components/editor/VisualEditor";
-import { Drawer } from "@/components/ui/Drawer";
 import { ChatPanel } from "@/components/ai/ChatPanel";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { CurrentDocPanel } from "@/components/sidebar/CurrentDocPanel";
@@ -26,8 +25,6 @@ import { useWorkshop } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function Workspace() {
-  const aiOpen = useWorkshop((s) => s.aiOpen);
-  const setAiOpen = useWorkshop((s) => s.setAiOpen);
   const sidebarPanel = useWorkshop((s) => s.sidebarPanel);
   const setSidebarPanel = useWorkshop((s) => s.setSidebarPanel);
   const markdown = useWorkshop((s) => s.markdown);
@@ -68,28 +65,6 @@ export function Workspace() {
             {saveStatus === "saving" && " · 保存中..."}
             {saveStatus === "saved" && " · 已保存"}
           </span>
-          <button
-            onClick={() =>
-              setSidebarPanel(sidebarPanel === "publish" ? null : "publish")
-            }
-            className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
-              sidebarPanel === "publish"
-                ? "bg-app-fg text-app-bg"
-                : "text-app-fg hover:bg-app-surface-hover border border-app-border"
-            )}
-          >
-            <Send size={11} />
-            发布
-          </button>
-          <button
-            onClick={() => setAiOpen(true)}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-app-fg hover:bg-app-surface-hover border border-app-border transition-colors"
-            title="AI 副驾驶"
-          >
-            <Sparkles size={11} />
-            副驾驶
-          </button>
         </div>
       </header>
 
@@ -142,6 +117,27 @@ export function Workspace() {
               }
               label="资产"
             />
+
+            <div className="w-6 h-px bg-app-border my-1" />
+
+            <RailButton
+              icon={<Sparkles size={15} />}
+              active={sidebarPanel === "ai"}
+              onClick={() =>
+                setSidebarPanel(sidebarPanel === "ai" ? null : "ai")
+              }
+              label="AI 写作助手"
+            />
+            <RailButton
+              icon={<Send size={15} />}
+              active={sidebarPanel === "publish"}
+              onClick={() =>
+                setSidebarPanel(
+                  sidebarPanel === "publish" ? null : "publish"
+                )
+              }
+              label="发布"
+            />
           </div>
           <div className="flex-1" />
           <RailButton
@@ -160,6 +156,7 @@ export function Workspace() {
             {sidebarPanel === "obsidian" && <ObsidianPanel />}
             {sidebarPanel === "assets" && <AssetsPanel />}
             {sidebarPanel === "publish" && <PublishCenter />}
+            {sidebarPanel === "ai" && <ChatPanel />}
             <button
               onClick={() => setSidebarPanel(null)}
               className="absolute top-1/2 -right-3 -translate-y-1/2 z-10 w-6 h-6 rounded-full border border-app-border bg-app-surface shadow-sm flex items-center justify-center text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover transition-colors"
@@ -175,22 +172,6 @@ export function Workspace() {
           <VisualEditor />
         </main>
       </div>
-
-      {/* AI drawer */}
-      <Drawer
-        open={aiOpen}
-        onOpenChange={setAiOpen}
-        side="right"
-        width="420px"
-        title={
-          <span className="flex items-center gap-1.5">
-            <Sparkles size={13} /> AI 副驾驶
-          </span>
-        }
-        description="选题、大纲、扩写、改稿、合规预检"
-      >
-        <ChatPanel />
-      </Drawer>
 
       {/* Settings dialog */}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

@@ -106,6 +106,25 @@ export function SettingsForm({
 
   return (
     <form onSubmit={submit} className="space-y-4 text-sm">
+      {/* ====== Writing preferences (first — most important) ====== */}
+      <Section
+        icon={<PenLine size={13} />}
+        title="写作偏好"
+        subtitle="写进这里的规则会注入所有 AI 动作，越具体越有效。"
+      >
+        <textarea
+          value={writingPreferences}
+          onChange={(e) => setWritingPreferences(e.target.value)}
+          rows={4}
+          placeholder={`示例：
+• 我写生活方式内容，读者是 20-30 岁年轻人。
+• 文风轻松自然，可以用口语，少用感叹号。
+• 案例优先用日常生活场景。
+• 段落短，长短句交错，有呼吸感。`}
+          className="w-full px-2.5 py-2 rounded-md border border-app-border bg-app-surface text-app-fg text-xs leading-relaxed resize-y focus:outline-none focus:border-app-fg-muted"
+        />
+      </Section>
+
       {/* ====== Text generation ====== */}
       <Section
         icon={<MessageSquareText size={13} />}
@@ -235,34 +254,8 @@ export function SettingsForm({
         </div>
       </Section>
 
-      {/* ====== Writing preferences ====== */}
-      <Section
-        icon={<PenLine size={13} />}
-        title="写作偏好"
-        subtitle="自由文本，喂给所有 AI 文本生成 (大纲/扩写/原生化等)，AI 会遵守。"
-      >
-        <textarea
-          value={writingPreferences}
-          onChange={(e) => setWritingPreferences(e.target.value)}
-          rows={5}
-          placeholder={`示例：
-• 我写公众号财经赛道，读者是 25-40 岁普通投资者。
-• 文风偏冷静理性，少用 emoji、少用感叹号。
-• 案例优先用 A 股具体公司而非美股。
-• 永远不要用"暴富/翻倍/稳赚"这类承诺词。
-• 段落短，常用 60-90 字一段，长短交错。`}
-          className="w-full px-2.5 py-2 rounded-md border border-app-border bg-app-surface text-app-fg text-xs leading-relaxed resize-y focus:outline-none focus:border-app-fg-muted"
-        />
-        <p className="text-[10px] text-app-fg-muted mt-1 leading-relaxed">
-          这些规则会注入每个 AI 文本动作的 system prompt。可以放风格/禁忌/读者画像/案例偏好/句长偏好，越具体越有效。
-        </p>
-      </Section>
-
       <p className="text-[11px] text-app-fg-muted leading-relaxed border-t border-app-border pt-3">
-        Key 保存在你的浏览器 localStorage 中，请求经本应用的{" "}
-        <code className="bg-app-surface-hover px-1 rounded">/api/llm</code> 和{" "}
-        <code className="bg-app-surface-hover px-1 rounded">/api/image</code>{" "}
-        转发，不会落到我们的服务器存储。请勿在共享设备上保存生产密钥。
+        Key 保存在你的浏览器 localStorage 中，不会落到服务器存储。请勿在共享设备上保存生产密钥。
       </p>
 
       <div className="flex justify-end">

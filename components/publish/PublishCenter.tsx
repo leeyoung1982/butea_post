@@ -51,7 +51,7 @@ export function PublishCenter() {
   const setTranslationProgress = useWorkshop((s) => s.setTranslationProgress);
   const topic = useWorkshop((s) => s.topic);
   const audience = useWorkshop((s) => s.audience);
-  const setAiOpen = useWorkshop((s) => s.setAiOpen);
+  const setSidebarPanel = useWorkshop((s) => s.setSidebarPanel);
 
   const customThemeTokens = useWorkshop((s) => s.customThemeTokens);
   const theme = React.useMemo(
@@ -157,7 +157,7 @@ export function PublishCenter() {
       if ((e as Error).name === "AbortError") return;
       if (e instanceof MissingLLMKeyError) {
         setError(e.message);
-        setAiOpen(true);
+        setSidebarPanel("ai");
         return;
       }
       setError((e as Error).message);

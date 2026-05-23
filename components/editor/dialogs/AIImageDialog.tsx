@@ -46,7 +46,7 @@ export function AIImageDialog({
 }) {
   const topic = useWorkshop((s) => s.topic);
   const themeId = useWorkshop((s) => s.themeId);
-  const setAiOpen = useWorkshop((s) => s.setAiOpen);
+  const setSidebarPanel = useWorkshop((s) => s.setSidebarPanel);
 
   const [prompt, setPrompt] = React.useState("");
   const [style, setStyle] = React.useState<ImageStyle>("vivid");
@@ -97,7 +97,7 @@ export function AIImageDialog({
     } catch (e) {
       if (e instanceof MissingImageKeyError) {
         setError(e.message);
-        setAiOpen(true);
+        setSidebarPanel("ai");
       } else {
         setError((e as Error).message);
       }

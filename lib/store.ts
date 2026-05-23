@@ -62,9 +62,9 @@ export type DocumentState = {
   aiOpen: boolean;
   setAiOpen: (open: boolean) => void;
 
-  sidebarPanel: "current" | "library" | "obsidian" | "assets" | "publish" | null;
+  sidebarPanel: "current" | "library" | "obsidian" | "assets" | "publish" | "ai" | null;
   setSidebarPanel: (
-    p: "current" | "library" | "obsidian" | "assets" | "publish" | null
+    p: "current" | "library" | "obsidian" | "assets" | "publish" | "ai" | null
   ) => void;
 
   /** True once user has connected a vault via File System Access API */

@@ -135,7 +135,7 @@ npm run build
 │   ├── publish/            # 发布面板 + 导出
 │   ├── sidebar/            # 侧边栏面板（文档库/本篇/资产）
 │   ├── themes/             # 主题选择器
-│   ├── ai/                 # AI 副驾驶
+│   ├── ai/                 # AI 写作助手
 │   ├── settings/           # 设置对话框
 │   └── ui/                 # 基础 UI 组件
 ├── lib/

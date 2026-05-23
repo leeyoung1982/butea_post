@@ -9,7 +9,7 @@ export type TranslateProgress = (chunk: string, accumulated: string) => void;
 
 export class MissingLLMKeyError extends Error {
   constructor() {
-    super("尚未配置 LLM Provider — 请在 AI 副驾驶里填入 API key");
+    super("尚未配置 LLM Provider — 请在 AI 写作助手里填入 API key");
     this.name = "MissingLLMKeyError";
   }
 }

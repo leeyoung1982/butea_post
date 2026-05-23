@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Send, Square, Settings, Sparkles, RefreshCw } from "lucide-react";
+import {
+  Send,
+  Square,
+  Settings,
+  Sparkles,
+  RefreshCw,
+  ChevronDown,
+  PenLine,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SkillLibrary } from "./SkillLibrary";
 import { SettingsForm } from "./SettingsForm";
@@ -127,42 +135,40 @@ export function ChatPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Topic/audience hint */}
-      <div className="px-4 py-3 border-b border-app-border space-y-2">
+      {/* Panel header */}
+      <div className="px-4 py-3 border-b border-app-border">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-app-fg mb-2">
+          <Sparkles size={13} /> AI 写作助手
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <LabeledInput
-            label="赛道 / 话题"
+            label="话题"
             value={topic}
             onChange={setTopic}
-            placeholder="如：副业焦虑"
+            placeholder="如：周末独处、跑步入门"
           />
           <LabeledInput
             label="目标读者"
             value={audience}
             onChange={setAudience}
-            placeholder="25-35 岁白领"
+            placeholder="如：大学生、新手爸妈"
           />
         </div>
         {selection && (
-          <div className="text-[11px] text-app-fg-muted bg-app-bg px-2 py-1.5 rounded border border-app-border">
+          <div className="mt-2 text-[11px] text-app-fg-muted bg-app-bg px-2 py-1.5 rounded border border-app-border">
             <span className="text-app-fg-subtle">已选中：</span>
             <span className="line-clamp-1">{selection.slice(0, 80)}</span>
           </div>
         )}
       </div>
 
-      {/* Skill library or settings */}
-      <details className="border-b border-app-border group">
-        <summary className="px-4 py-2.5 text-xs uppercase tracking-wider text-app-fg-subtle cursor-pointer hover:text-app-fg flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Sparkles size={11} /> Skill 库
-          </span>
-          <span className="text-app-fg-subtle group-open:rotate-90 transition-transform">›</span>
-        </summary>
-        <div className="px-4 pb-3">
-          <SkillLibrary onPick={onPickSkill} />
+      {/* Skill library — always expanded */}
+      <div className="border-b border-app-border px-4 py-3">
+        <div className="text-xs uppercase tracking-wider text-app-fg-subtle mb-2 flex items-center gap-1.5">
+          <Sparkles size={11} /> Skill 库
         </div>
-      </details>
+        <SkillLibrary onPick={onPickSkill} />
+      </div>
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-auto px-4 py-3 space-y-3">
@@ -170,7 +176,7 @@ export function ChatPanel() {
           <div className="text-xs text-app-fg-muted leading-relaxed">
             从上面点一个 Skill 开始，或直接输入对话。
             <div className="mt-3 text-[11px] text-app-fg-subtle">
-              提示：在左侧编辑器选中段落，再点 <span className="text-app-fg">「段落扩写 / 切换文风 / 加钩子」</span> 类 Skill 会对选中文本起作用。
+              提示：在编辑器选中段落，再点 <span className="text-app-fg">「段落扩写 / 切换文风 / 加钩子」</span> 类 Skill 会对选中文本起作用。
             </div>
           </div>
         ) : (
@@ -194,22 +200,37 @@ export function ChatPanel() {
         )}
       </div>
 
-      {/* Settings drawer */}
-      {showSettings && (
-        <div className="border-t border-app-border bg-app-surface-hover px-4 py-3">
-          <div className="text-xs uppercase tracking-wider text-app-fg-subtle mb-2">
-            LLM 配置
-          </div>
-          <SettingsForm
-            initial={settings}
-            onSave={(s) => {
-              saveSettings(s);
-              setSettings(s);
-              setShowSettings(false);
-            }}
+      {/* Collapsible settings drawer */}
+      <div className="border-t border-app-border">
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2 text-xs text-app-fg-subtle hover:text-app-fg hover:bg-app-surface-hover transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <Settings size={11} />
+            写作偏好 & LLM 配置
+          </span>
+          <ChevronDown
+            size={12}
+            className={cn(
+              "transition-transform",
+              showSettings && "rotate-180"
+            )}
           />
-        </div>
-      )}
+        </button>
+        {showSettings && (
+          <div className="px-4 pb-3 max-h-[50vh] overflow-auto">
+            <SettingsForm
+              initial={settings}
+              onSave={(s) => {
+                saveSettings(s);
+                setSettings(s);
+                setShowSettings(false);
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Composer */}
       <div className="border-t border-app-border px-3 py-2.5 bg-app-surface">
@@ -247,14 +268,6 @@ export function ChatPanel() {
                 <Send size={13} />
               </Button>
             )}
-            <Button
-              size="iconSm"
-              variant="ghost"
-              onClick={() => setShowSettings((v) => !v)}
-              title="LLM 设置"
-            >
-              <Settings size={13} />
-            </Button>
             <Button
               size="iconSm"
               variant="ghost"
