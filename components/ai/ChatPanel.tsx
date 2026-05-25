@@ -12,6 +12,11 @@ import {
   Check,
   Feather,
   ArrowLeft,
+  FileEdit,
+  ClipboardCopy,
+  Wand2,
+  PenTool,
+  MessageCircle,
 } from "lucide-react";
 import { SkillLibrary } from "./SkillLibrary";
 import { SettingsForm } from "./SettingsForm";
@@ -24,6 +29,7 @@ import {
 } from "@/lib/llm/providers";
 import { streamChat, type ChatMessage } from "@/lib/llm/client";
 import { withPrefs, type Skill } from "@/lib/llm/skills";
+import { WRITING_AGENT_SYSTEM, detectContentType } from "@/lib/llm/agent";
 import {
   generateImage,
   imageMarkdown,
@@ -31,6 +37,8 @@ import {
 } from "@/lib/llm/image";
 import { insertAtCursor } from "@/lib/editor-ref";
 import { cn } from "@/lib/utils";
+
+type ChatMode = "agent" | "free";
 
 type DisplayMessage = ChatMessage & {
   id: string;
@@ -44,15 +52,18 @@ export function ChatPanel() {
   const setAudience = useWorkshop((s) => s.setAudience);
   const selection = useWorkshop((s) => s.selection);
   const draft = useWorkshop((s) => s.markdown);
+  const setMarkdown = useWorkshop((s) => s.setMarkdown);
 
   const [settings, setSettings] = React.useState<LLMSettings | null>(null);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [chatMode, setChatMode] = React.useState<ChatMode>("agent");
   const [messages, setMessages] = React.useState<DisplayMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [streaming, setStreaming] = React.useState(false);
   const [showSkills, setShowSkills] = React.useState(false);
   const [imageMode, setImageMode] = React.useState(false);
   const [inserting, setInserting] = React.useState<string | null>(null);
+  const [appliedIds, setAppliedIds] = React.useState<Set<string>>(new Set());
   const abortRef = React.useRef<AbortController | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const skillsRef = React.useRef<HTMLDivElement | null>(null);
@@ -83,12 +94,29 @@ export function ChatPanel() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showSkills]);
 
-  // Auto-resize textarea
   const autoResize = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  };
+
+  // Build message list for API call, injecting system prompt for agent mode
+  const buildApiMessages = (
+    msgs: DisplayMessage[]
+  ): { role: string; content: string }[] => {
+    const apiMsgs = msgs.map(({ role, content }) => ({ role, content }));
+
+    if (chatMode === "agent") {
+      // Inject agent system prompt if not already present
+      const hasSystem = apiMsgs.some((m) => m.role === "system");
+      if (!hasSystem) {
+        const prefs = loadWritingPreferences();
+        const sys = withPrefs(WRITING_AGENT_SYSTEM, prefs);
+        apiMsgs.unshift({ role: "system", content: sys });
+      }
+    }
+    return apiMsgs;
   };
 
   const runChat = async (next: DisplayMessage[]) => {
@@ -108,7 +136,7 @@ export function ChatPanel() {
     try {
       const stream = streamChat(
         settings,
-        next.map(({ role, content }) => ({ role, content })),
+        buildApiMessages(next) as ChatMessage[],
         controller.signal
       );
       let acc = "";
@@ -149,7 +177,11 @@ export function ChatPanel() {
     const next = [
       ...messages,
       userMsg,
-      { id: assistantId, role: "assistant" as const, content: "正在生成图片..." },
+      {
+        id: assistantId,
+        role: "assistant" as const,
+        content: "正在生成图片...",
+      },
     ];
     setMessages(next);
     setStreaming(true);
@@ -162,7 +194,9 @@ export function ChatPanel() {
           m.id === assistantId
             ? {
                 ...m,
-                content: img.revisedPrompt ? `Prompt: ${img.revisedPrompt}` : "",
+                content: img.revisedPrompt
+                  ? `Prompt: ${img.revisedPrompt}`
+                  : "",
                 imageB64: img.b64,
               }
             : m
@@ -185,7 +219,6 @@ export function ChatPanel() {
     if (!input.trim() || streaming) return;
     const text = input;
     setInput("");
-    // Reset textarea height
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     if (imageMode) {
       runImageGen(text);
@@ -197,6 +230,16 @@ export function ChatPanel() {
       setMessages(next);
       runChat(next);
     }
+  };
+
+  // Send a follow-up message (for action buttons like "开始扩写")
+  const sendFollowUp = (text: string) => {
+    const next: DisplayMessage[] = [
+      ...messages,
+      { id: crypto.randomUUID(), role: "user", content: text },
+    ];
+    setMessages(next);
+    runChat(next);
   };
 
   const onPickSkill = (skill: Skill) => {
@@ -220,6 +263,21 @@ export function ChatPanel() {
     runChat(next);
   };
 
+  const applyToEditor = (content: string, msgId: string) => {
+    // Extract markdown content — strip conversational preamble
+    const lines = content.split("\n");
+    const firstHeadingIdx = lines.findIndex((l) => /^#{1,3} /.test(l));
+    const mdContent =
+      firstHeadingIdx >= 0 ? lines.slice(firstHeadingIdx).join("\n") : content;
+
+    setMarkdown(mdContent.trim());
+    setAppliedIds((prev) => new Set(prev).add(msgId));
+  };
+
+  const copyContent = (content: string) => {
+    navigator.clipboard.writeText(content);
+  };
+
   const insertImage = async (b64: string) => {
     setInserting(b64);
     try {
@@ -234,9 +292,21 @@ export function ChatPanel() {
   const resetChat = () => {
     setMessages([]);
     setImageMode(false);
+    setAppliedIds(new Set());
   };
 
-  // ---- Settings full-page overlay inside the sidebar ----
+  const switchMode = (mode: ChatMode) => {
+    if (mode === chatMode) return;
+    if (messages.length > 0) {
+      if (!confirm("切换模式会清空当前对话，确定？")) return;
+    }
+    setChatMode(mode);
+    setMessages([]);
+    setImageMode(false);
+    setAppliedIds(new Set());
+  };
+
+  // ---- Settings overlay ----
   if (showSettings) {
     return (
       <div className="flex flex-col h-full">
@@ -247,7 +317,7 @@ export function ChatPanel() {
           >
             <ArrowLeft size={16} />
           </button>
-          <span className="text-sm font-semibold text-app-fg">
+          <span className="text-xs font-medium text-app-fg">
             写作偏好 & LLM 配置
           </span>
         </div>
@@ -265,101 +335,115 @@ export function ChatPanel() {
     );
   }
 
-  // ---- Main chat view ----
+  // ---- Main view ----
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-app-border flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-app-fg">
-          <Sparkles size={13} /> AI 写作助手
+      <div className="px-4 py-2.5 border-b border-app-border">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-app-fg">
+            <Sparkles size={13} /> AI 写作助手
+          </div>
+          <div className="flex items-center gap-1">
+            {selection && (
+              <div className="text-[10px] text-app-fg-muted bg-app-bg px-2 py-0.5 rounded border border-app-border max-w-[100px] truncate mr-0.5">
+                已选中
+              </div>
+            )}
+            <button
+              onClick={resetChat}
+              title="清空对话"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover transition-colors"
+            >
+              <RefreshCw size={13} />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              title="写作偏好 & LLM 配置"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover transition-colors"
+            >
+              <Feather size={14} />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {selection && (
-            <div className="text-[10px] text-app-fg-muted bg-app-bg px-2 py-1 rounded border border-app-border max-w-[120px] truncate mr-1">
-              已选中
-            </div>
-          )}
+
+        {/* Mode tabs */}
+        <div className="flex gap-1 bg-app-bg rounded-lg p-0.5">
           <button
-            onClick={resetChat}
-            title="清空对话"
-            className="w-7 h-7 rounded-md flex items-center justify-center text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover transition-colors"
+            onClick={() => switchMode("agent")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors",
+              chatMode === "agent"
+                ? "bg-app-surface shadow-sm text-app-fg font-medium"
+                : "text-app-fg-muted hover:text-app-fg"
+            )}
           >
-            <RefreshCw size={13} />
+            <PenTool size={12} />
+            写作引导
           </button>
           <button
-            onClick={() => setShowSettings(true)}
-            title="写作偏好 & LLM 配置"
-            className="w-7 h-7 rounded-md flex items-center justify-center text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover transition-colors"
+            onClick={() => switchMode("free")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors",
+              chatMode === "free"
+                ? "bg-app-surface shadow-sm text-app-fg font-medium"
+                : "text-app-fg-muted hover:text-app-fg"
+            )}
           >
-            <Feather size={14} />
+            <MessageCircle size={12} />
+            自由对话
           </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-auto px-4 py-3 space-y-3">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-auto px-4 py-3 space-y-3"
+      >
         {messages.length === 0 ? (
-          <div className="text-xs text-app-fg-muted leading-relaxed mt-8 text-center">
-            <div className="text-app-fg-subtle mb-2">
-              点击输入框中 <Plus size={10} className="inline -mt-0.5" /> 选择 Skill，或直接输入对话
-            </div>
-            <div className="text-[11px]">
-              选中编辑器文本后使用「扩写 / 改写」类 Skill 效果更佳
-            </div>
-          </div>
+          <EmptyState
+            mode={chatMode}
+            onQuickStart={(text) => {
+              const next: DisplayMessage[] = [
+                { id: crypto.randomUUID(), role: "user", content: text },
+              ];
+              setMessages(next);
+              runChat(next);
+            }}
+          />
         ) : (
           messages
             .filter((m) => m.role !== "system")
-            .map((m) => (
-              <div key={m.id} className="animate-fade-in">
-                {m.role === "user" ? (
-                  <div className="flex justify-end">
-                    <div className="max-w-[85%] bg-blue-50 dark:bg-blue-950/30 text-app-fg rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
-                      <div className="whitespace-pre-wrap break-words">
-                        {m.content}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="max-w-[95%]">
-                    {m.imageB64 && (
-                      <div className="mb-2 rounded-lg overflow-hidden border border-app-border relative group">
-                        <img
-                          src={`data:image/png;base64,${m.imageB64}`}
-                          alt="AI generated"
-                          className="w-full h-auto"
-                        />
-                        <button
-                          onClick={() => insertImage(m.imageB64!)}
-                          disabled={inserting === m.imageB64}
-                          className="absolute bottom-2 right-2 bg-white/90 dark:bg-black/70 text-black dark:text-white px-2.5 py-1.5 rounded-md text-xs flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-white dark:hover:bg-black/90"
-                        >
-                          {inserting === m.imageB64 ? (
-                            <><Check size={12} /> 已添加</>
-                          ) : (
-                            <><Plus size={12} /> 插入正文 & 存入资产</>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                    {m.content && (
-                      <div className="text-sm leading-relaxed text-app-fg whitespace-pre-wrap break-words">
-                        {m.content}
-                      </div>
-                    )}
-                    {!m.content && !m.imageB64 && streaming && (
-                      <div className="text-sm text-app-fg-muted">▍</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))
+            .map((m, _i, arr) => {
+              const isLastAssistant =
+                m.role === "assistant" &&
+                arr.filter((x) => x.role === "assistant").at(-1)?.id === m.id;
+              return (
+                <div key={m.id} className="animate-fade-in">
+                  {m.role === "user" ? (
+                    <UserBubble content={m.content} />
+                  ) : (
+                    <AssistantMessage
+                      msg={m}
+                      streaming={streaming}
+                      isLast={isLastAssistant}
+                      applied={appliedIds.has(m.id)}
+                      inserting={inserting}
+                      onApply={(content) => applyToEditor(content, m.id)}
+                      onCopy={copyContent}
+                      onExpand={() => sendFollowUp("开始扩写全文，输出完整 Markdown 正文。")}
+                      onInsertImage={insertImage}
+                    />
+                  )}
+                </div>
+              );
+            })
         )}
       </div>
 
-      {/* Composer — ChatGPT-style input box */}
+      {/* Composer */}
       <div className="px-3 pb-3 pt-1 relative">
-        {/* Image mode indicator */}
         {imageMode && (
           <div className="flex items-center gap-1.5 mb-1.5 px-1 text-xs text-blue-600 dark:text-blue-400">
             <ImageIcon size={12} />
@@ -373,8 +457,8 @@ export function ChatPanel() {
           </div>
         )}
 
-        {/* Skill picker popover */}
-        {showSkills && (
+        {/* Skill picker popover — only in free mode */}
+        {showSkills && chatMode === "free" && (
           <div
             ref={skillsRef}
             className="absolute bottom-full left-0 right-0 mb-1 mx-3 bg-app-surface border border-app-border rounded-lg shadow-lg max-h-[60vh] overflow-auto z-20"
@@ -400,9 +484,7 @@ export function ChatPanel() {
           </div>
         )}
 
-        {/* The input container */}
         <div className="border border-app-border rounded-xl bg-app-bg focus-within:border-app-fg-muted transition-colors">
-          {/* Textarea */}
           <textarea
             ref={textareaRef}
             value={input}
@@ -411,7 +493,12 @@ export function ChatPanel() {
               autoResize();
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+              if (
+                e.key === "Enter" &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.shiftKey
+              ) {
                 e.preventDefault();
                 onSend();
               }
@@ -419,30 +506,30 @@ export function ChatPanel() {
             placeholder={
               imageMode
                 ? "描述你想要的图片..."
-                : "今天想写点什么？"
+                : chatMode === "agent"
+                  ? "告诉我你想写什么..."
+                  : "今天想写点什么？"
             }
             rows={1}
             className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm placeholder:text-app-fg-subtle focus:outline-none min-h-[40px]"
           />
 
-          {/* Bottom toolbar row inside the input box */}
           <div className="flex items-center justify-between px-2 pb-2">
             <div className="flex items-center gap-0.5">
-              {/* "+" Skill picker */}
-              <button
-                onClick={() => setShowSkills((v) => !v)}
-                title="Skill 库"
-                className={cn(
-                  "w-7 h-7 rounded-lg flex items-center justify-center transition-colors",
-                  showSkills
-                    ? "bg-app-fg text-app-bg"
-                    : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover"
-                )}
-              >
-                <Plus size={15} />
-              </button>
-
-              {/* Image mode toggle */}
+              {chatMode === "free" && (
+                <button
+                  onClick={() => setShowSkills((v) => !v)}
+                  title="Skill 库"
+                  className={cn(
+                    "w-7 h-7 rounded-lg flex items-center justify-center transition-colors",
+                    showSkills
+                      ? "bg-app-fg text-app-bg"
+                      : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover"
+                  )}
+                >
+                  <Plus size={15} />
+                </button>
+              )}
               <button
                 onClick={() => setImageMode((v) => !v)}
                 title="文生图"
@@ -457,7 +544,6 @@ export function ChatPanel() {
               </button>
             </div>
 
-            {/* Send / Stop */}
             {streaming ? (
               <button
                 onClick={stopStream}
@@ -485,5 +571,190 @@ export function ChatPanel() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function EmptyState({
+  mode,
+  onQuickStart,
+}: {
+  mode: ChatMode;
+  onQuickStart?: (text: string) => void;
+}) {
+  if (mode === "agent") {
+    return (
+      <div className="text-center mt-8 space-y-3">
+        <div className="w-10 h-10 rounded-full bg-app-surface-hover flex items-center justify-center mx-auto">
+          <PenTool size={18} className="text-app-fg-muted" />
+        </div>
+        <div className="text-sm text-app-fg font-medium">从零开始写一篇文章</div>
+        <div className="text-xs text-app-fg-muted leading-relaxed max-w-[220px] mx-auto">
+          告诉我你想写什么，我会引导你完成选题、大纲、到全文的整个过程
+        </div>
+        <div className="flex flex-wrap justify-center gap-1.5 pt-1">
+          {[
+            "写一篇关于独居生活的文章",
+            "帮我写个跑步入门指南",
+            "我想聊聊读书的方法",
+          ].map((s) => (
+            <button
+              key={s}
+              onClick={() => onQuickStart?.(s)}
+              className="text-[11px] px-2.5 py-1.5 rounded-full border border-app-border text-app-fg-muted hover:text-app-fg hover:border-app-fg-muted transition-colors"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-xs text-app-fg-muted leading-relaxed mt-8 text-center">
+      <div className="text-app-fg-subtle mb-2">
+        点击输入框中{" "}
+        <Plus size={10} className="inline -mt-0.5" /> 选择 Skill，或直接输入对话
+      </div>
+      <div className="text-[11px]">
+        选中编辑器文本后使用「扩写 / 改写」类 Skill 效果更佳
+      </div>
+    </div>
+  );
+}
+
+function UserBubble({ content }: { content: string }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[85%] bg-blue-50 dark:bg-blue-950/30 text-app-fg rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
+        <div className="whitespace-pre-wrap break-words">{content}</div>
+      </div>
+    </div>
+  );
+}
+
+function AssistantMessage({
+  msg,
+  streaming,
+  isLast,
+  applied,
+  inserting,
+  onApply,
+  onCopy,
+  onExpand,
+  onInsertImage,
+}: {
+  msg: DisplayMessage;
+  streaming: boolean;
+  isLast: boolean;
+  applied: boolean;
+  inserting: string | null;
+  onApply: (content: string) => void;
+  onCopy: (content: string) => void;
+  onExpand: () => void;
+  onInsertImage: (b64: string) => void;
+}) {
+  const contentType = React.useMemo(
+    () => (streaming ? "none" : detectContentType(msg.content)),
+    [msg.content, streaming]
+  );
+  const showActions = isLast && !streaming && contentType !== "none";
+
+  return (
+    <div className="max-w-[95%]">
+      {/* Image */}
+      {msg.imageB64 && (
+        <div className="mb-2 rounded-lg overflow-hidden border border-app-border relative group">
+          <img
+            src={`data:image/png;base64,${msg.imageB64}`}
+            alt="AI generated"
+            className="w-full h-auto"
+          />
+          <button
+            onClick={() => onInsertImage(msg.imageB64!)}
+            disabled={inserting === msg.imageB64}
+            className="absolute bottom-2 right-2 bg-white/90 dark:bg-black/70 text-black dark:text-white px-2.5 py-1.5 rounded-md text-xs flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+          >
+            {inserting === msg.imageB64 ? (
+              <>
+                <Check size={12} /> 已添加
+              </>
+            ) : (
+              <>
+                <Plus size={12} /> 插入正文 & 存入资产
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Text content */}
+      {msg.content && (
+        <div className="text-sm leading-relaxed text-app-fg whitespace-pre-wrap break-words">
+          {msg.content}
+        </div>
+      )}
+
+      {/* Streaming cursor */}
+      {!msg.content && !msg.imageB64 && streaming && (
+        <div className="text-sm text-app-fg-muted">▍</div>
+      )}
+
+      {/* Action buttons */}
+      {showActions && (
+        <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-app-border/50">
+          <ActionButton
+            icon={applied ? <Check size={12} /> : <FileEdit size={12} />}
+            label={applied ? "已应用" : "应用到编辑器"}
+            onClick={() => onApply(msg.content)}
+            active={applied}
+          />
+          {contentType === "outline" && !applied && (
+            <ActionButton
+              icon={<Wand2 size={12} />}
+              label="开始扩写全文"
+              onClick={onExpand}
+            />
+          )}
+          <ActionButton
+            icon={<ClipboardCopy size={12} />}
+            label="复制"
+            onClick={() => onCopy(msg.content)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  active,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={active}
+      className={cn(
+        "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors",
+        active
+          ? "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400"
+          : "bg-app-surface-hover text-app-fg-muted hover:text-app-fg border border-app-border/50"
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
