@@ -280,9 +280,9 @@ function Section({
 }) {
   return (
     <div className="border border-app-border rounded-lg p-3.5 bg-app-bg space-y-2.5">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <span className="text-app-fg-muted">{icon}</span>
-        <span className="text-sm font-semibold text-app-fg">{title}</span>
+        <span className="text-xs font-medium text-app-fg">{title}</span>
       </div>
       <p className="text-[11px] text-app-fg-muted leading-relaxed -mt-1">
         {subtitle}
