@@ -12,6 +12,7 @@ import {
   type AstroBlogConfig,
 } from "@/lib/publish/astro";
 import { useWorkshop } from "@/lib/store";
+import { stripImageAdmonitions } from "@/lib/md/admonitions";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,10 @@ export function AstroPushSection() {
     setError(null);
     setResult(null);
     try {
-      const content = buildAstroPost(markdown, {
+      // Strip [!image] placeholders before pushing — author-only cues, not
+      // publishable content.
+      const publishable = stripImageAdmonitions(markdown).stripped;
+      const content = buildAstroPost(publishable, {
         title,
         description: description || title,
       });

@@ -21,6 +21,7 @@ import {
   hashMarkdown,
   MissingLLMKeyError,
 } from "@/lib/llm/translate";
+import { stripImageAdmonitions } from "@/lib/md/admonitions";
 import { ImageHostPanel } from "@/components/publish/ImageHostPanel";
 import { AstroPushSection } from "@/components/publish/AstroPushSection";
 import { Button } from "@/components/ui/Button";
@@ -78,11 +79,19 @@ export function PublishCenter() {
     return markdown;
   }, [markdown, currentPlatform, useTranslation, translations]);
 
+  // Strip `> [!image]` placeholders before handing to the adapter — they're
+  // editor-only authoring cues, not publishable content. We also surface the
+  // count so we can warn the user about unfulfilled image suggestions.
+  const { cleanedMarkdown, pendingImageSuggestions } = React.useMemo(() => {
+    const { stripped, count } = stripImageAdmonitions(effectiveMarkdown);
+    return { cleanedMarkdown: stripped, pendingImageSuggestions: count };
+  }, [effectiveMarkdown]);
+
   // Render preview
   React.useEffect(() => {
     let cancelled = false;
     adapter
-      .render({ markdown: effectiveMarkdown, topic, audience }, theme)
+      .render({ markdown: cleanedMarkdown, topic, audience }, theme)
       .then((r) => {
         if (!cancelled) setOutput(r);
       })
@@ -93,7 +102,7 @@ export function PublishCenter() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveMarkdown, theme, adapter, topic, audience]);
+  }, [cleanedMarkdown, theme, adapter, topic, audience]);
 
   const flash = (key: string) => {
     setCopied(key);
@@ -112,7 +121,7 @@ export function PublishCenter() {
   const copyRichHtml = async (html: string) => {
     try {
       const blob = new Blob([html], { type: "text/html" });
-      const textBlob = new Blob([markdown], { type: "text/plain" });
+      const textBlob = new Blob([cleanedMarkdown], { type: "text/plain" });
       await navigator.clipboard.write([
         new ClipboardItem({ "text/html": blob, "text/plain": textBlob }),
       ]);
@@ -144,7 +153,9 @@ export function PublishCenter() {
     try {
       const md = await translateForPlatform(
         currentPlatform,
-        { markdown, topic, audience },
+        // Image admonitions are author-only cues — strip before AI rewrite so
+        // they don't get translated into the platform-native output.
+        { markdown: stripImageAdmonitions(markdown).stripped, topic, audience },
         (_chunk, accumulated) => setTranslationProgress(accumulated),
         controller.signal
       );
@@ -176,6 +187,21 @@ export function PublishCenter() {
           选择平台，预览效果，一键复制或下载
         </div>
       </div>
+
+      {/* Unfulfilled image-suggestion warning — these are stripped from the
+          preview but the user almost always wants to insert real images
+          before publishing. */}
+      {pendingImageSuggestions > 0 && (
+        <div className="px-3 py-2 border-b border-app-border bg-pink-50 dark:bg-pink-950/20">
+          <div className="flex items-start gap-2 text-[11px] text-pink-700 dark:text-pink-300">
+            <AlertCircle size={12} className="mt-[1px] shrink-0" />
+            <div className="leading-relaxed">
+              文中还有 <strong>{pendingImageSuggestions}</strong> 处「配图建议」
+              占位未处理。发布预览里已自动剥掉，但建议你回到编辑器填入实图或删掉占位。
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Platform selector */}
       <div className="px-3 py-2 border-b border-app-border space-y-1">
@@ -327,7 +353,7 @@ export function PublishCenter() {
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => copyText("md", markdown)}
+                onClick={() => copyText("md", cleanedMarkdown)}
               >
                 {copied === "md" ? (
                   <Check size={12} />
@@ -350,7 +376,7 @@ export function PublishCenter() {
                 size="sm"
                 variant="secondary"
                 onClick={() =>
-                  downloadFile(markdown, "md", "text/markdown")
+                  downloadFile(cleanedMarkdown, "md", "text/markdown")
                 }
               >
                 <Download size={12} />

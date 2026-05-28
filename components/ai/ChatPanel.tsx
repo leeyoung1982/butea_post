@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { SkillLibrary } from "./SkillLibrary";
 import { SettingsForm } from "./SettingsForm";
-import { useWorkshop } from "@/lib/store";
+import { useWorkshop, DEFAULT_MARKDOWN } from "@/lib/store";
 import {
   loadSettings,
   loadWritingPreferences,
@@ -29,13 +29,17 @@ import {
 } from "@/lib/llm/providers";
 import { streamChat, type ChatMessage } from "@/lib/llm/client";
 import { withPrefs, type Skill } from "@/lib/llm/skills";
-import { WRITING_AGENT_SYSTEM, detectContentType } from "@/lib/llm/agent";
+import {
+  WRITING_AGENT_SYSTEM,
+  detectContentType,
+  type AgentContentType,
+} from "@/lib/llm/agent";
 import {
   generateImage,
   imageMarkdown,
   MissingImageKeyError,
 } from "@/lib/llm/image";
-import { insertAtCursor } from "@/lib/editor-ref";
+import { insertAtCursor, insertBlockBelow } from "@/lib/editor-ref";
 import { cn } from "@/lib/utils";
 
 type ChatMode = "agent" | "free";
@@ -64,6 +68,9 @@ export function ChatPanel() {
   const [imageMode, setImageMode] = React.useState(false);
   const [inserting, setInserting] = React.useState<string | null>(null);
   const [appliedIds, setAppliedIds] = React.useState<Set<string>>(new Set());
+  // When user clicks apply but editor has content: show "replace / insert" choice
+  // on that specific message instead of immediately overwriting their work.
+  const [pendingApplyId, setPendingApplyId] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const skillsRef = React.useRef<HTMLDivElement | null>(null);
@@ -263,16 +270,82 @@ export function ChatPanel() {
     runChat(next);
   };
 
-  const applyToEditor = (content: string, msgId: string) => {
-    // Extract markdown content — strip conversational preamble
+  // Keywords that signal a trailing "meta" paragraph (agent's follow-up
+  // pleasantries like "草稿已完成。你可以点击应用到编辑器..."). When we apply
+  // to the editor, we want the document clean — strip these.
+  const META_KEYWORDS = [
+    "应用到编辑器",
+    "点击",
+    "可以告诉",
+    "继续打磨",
+    "继续完善",
+    "调整哪里",
+    "如有",
+    "你可以",
+    "可以直接",
+    "草稿已完成",
+    "大纲已完成",
+    "全文已完成",
+    "全文已写完",
+    "希望对你",
+  ];
+
+  // Strip any conversational preamble (before the first heading) AND any
+  // trailing meta paragraphs (agent's UI-action prompts after the content).
+  const extractMarkdown = (content: string): string => {
     const lines = content.split("\n");
     const firstHeadingIdx = lines.findIndex((l) => /^#{1,3} /.test(l));
     const mdContent =
       firstHeadingIdx >= 0 ? lines.slice(firstHeadingIdx).join("\n") : content;
 
-    setMarkdown(mdContent.trim());
-    setAppliedIds((prev) => new Set(prev).add(msgId));
+    // Walk paragraphs from the end, dropping any that look like meta-comments.
+    // Stop at the first real content paragraph (heading, bullet, or prose
+    // without UI keywords).
+    const paragraphs = mdContent.trim().split(/\n\s*\n/);
+    while (paragraphs.length > 1) {
+      const last = paragraphs[paragraphs.length - 1].trim();
+      if (/^#{1,6} /.test(last)) break;
+      if (/^[-*] /.test(last)) break;
+      if (last.startsWith("<!--")) break; // keep image-suggestion comments
+      const looksLikeMeta = META_KEYWORDS.some((k) => last.includes(k));
+      if (!looksLikeMeta) break;
+      paragraphs.pop();
+    }
+    return paragraphs.join("\n\n").trim();
   };
+
+  // Treat starter content as "empty" so first-time users get a zero-friction
+  // apply. Anything else triggers the replace/insert choice to protect the
+  // user's own writing.
+  const isEditorEmpty = (md: string): boolean => {
+    const trimmed = md.trim();
+    if (!trimmed) return true;
+    if (trimmed === DEFAULT_MARKDOWN.trim()) return true;
+    return false;
+  };
+
+  const requestApply = (msgId: string, content: string) => {
+    if (isEditorEmpty(draft)) {
+      setMarkdown(extractMarkdown(content));
+      setAppliedIds((prev) => new Set(prev).add(msgId));
+    } else {
+      setPendingApplyId(msgId);
+    }
+  };
+
+  const confirmReplace = (msgId: string, content: string) => {
+    setMarkdown(extractMarkdown(content));
+    setAppliedIds((prev) => new Set(prev).add(msgId));
+    setPendingApplyId(null);
+  };
+
+  const confirmInsert = (msgId: string, content: string) => {
+    insertBlockBelow(extractMarkdown(content));
+    setAppliedIds((prev) => new Set(prev).add(msgId));
+    setPendingApplyId(null);
+  };
+
+  const cancelApply = () => setPendingApplyId(null);
 
   const copyContent = (content: string) => {
     navigator.clipboard.writeText(content);
@@ -293,6 +366,7 @@ export function ChatPanel() {
     setMessages([]);
     setImageMode(false);
     setAppliedIds(new Set());
+    setPendingApplyId(null);
   };
 
   const switchMode = (mode: ChatMode) => {
@@ -304,6 +378,7 @@ export function ChatPanel() {
     setMessages([]);
     setImageMode(false);
     setAppliedIds(new Set());
+    setPendingApplyId(null);
   };
 
   // ---- Settings overlay ----
@@ -399,7 +474,7 @@ export function ChatPanel() {
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto px-4 py-3 space-y-3"
+        className="flex-1 overflow-auto px-4 py-3 space-y-2.5"
       >
         {messages.length === 0 ? (
           <EmptyState
@@ -416,9 +491,14 @@ export function ChatPanel() {
           messages
             .filter((m) => m.role !== "system")
             .map((m, _i, arr) => {
-              const isLastAssistant =
-                m.role === "assistant" &&
-                arr.filter((x) => x.role === "assistant").at(-1)?.id === m.id;
+              const lastAssistantId = arr
+                .filter((x) => x.role === "assistant")
+                .at(-1)?.id;
+              // Only the message currently being streamed should be flagged
+              // — every prior assistant message is "done" and should show its
+              // own action buttons (Issue 3: per-step apply).
+              const isCurrentlyStreaming =
+                streaming && m.role === "assistant" && m.id === lastAssistantId;
               return (
                 <div key={m.id} className="animate-fade-in">
                   {m.role === "user" ? (
@@ -426,13 +506,24 @@ export function ChatPanel() {
                   ) : (
                     <AssistantMessage
                       msg={m}
-                      streaming={streaming}
-                      isLast={isLastAssistant}
+                      isStreaming={isCurrentlyStreaming}
                       applied={appliedIds.has(m.id)}
+                      pendingChoice={pendingApplyId === m.id}
                       inserting={inserting}
-                      onApply={(content) => applyToEditor(content, m.id)}
+                      onRequestApply={(content) => requestApply(m.id, content)}
+                      onConfirmReplace={(content) =>
+                        confirmReplace(m.id, content)
+                      }
+                      onConfirmInsert={(content) =>
+                        confirmInsert(m.id, content)
+                      }
+                      onCancelApply={cancelApply}
                       onCopy={copyContent}
-                      onExpand={() => sendFollowUp("开始扩写全文，输出完整 Markdown 正文。")}
+                      onGenerateDraft={() =>
+                        sendFollowUp(
+                          "请直接生成草稿，一次性输出完整 Markdown 正文，不要分节暂停。"
+                        )
+                      }
                       onInsertImage={insertImage}
                     />
                   )}
@@ -512,7 +603,7 @@ export function ChatPanel() {
                   : "今天想写点什么？"
             }
             rows={1}
-            className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm placeholder:text-app-fg-subtle focus:outline-none min-h-[40px]"
+            className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[12.5px] placeholder:text-app-fg-subtle focus:outline-none min-h-[36px]"
           />
 
           <div className="flex items-center justify-between px-2 pb-2">
@@ -588,15 +679,15 @@ function EmptyState({
 }) {
   if (mode === "agent") {
     return (
-      <div className="text-center mt-8 space-y-3">
-        <div className="w-10 h-10 rounded-full bg-app-surface-hover flex items-center justify-center mx-auto">
-          <PenTool size={18} className="text-app-fg-muted" />
+      <div className="text-center mt-8 space-y-2.5">
+        <div className="w-9 h-9 rounded-full bg-app-surface-hover flex items-center justify-center mx-auto">
+          <PenTool size={16} className="text-app-fg-muted" />
         </div>
-        <div className="text-sm text-app-fg font-medium">从零开始写一篇文章</div>
-        <div className="text-xs text-app-fg-muted leading-relaxed max-w-[220px] mx-auto">
-          告诉我你想写什么，我会引导你完成选题、大纲、到全文的整个过程
+        <div className="text-[12.5px] text-app-fg font-medium">从零开始写一篇文章</div>
+        <div className="text-[11px] text-app-fg-muted leading-relaxed max-w-[220px] mx-auto">
+          告诉我你想写什么，我会引导你完成选题、大纲、到草稿的整个过程
         </div>
-        <div className="flex flex-wrap justify-center gap-1.5 pt-1">
+        <div className="flex flex-wrap justify-center gap-1 pt-1">
           {[
             "写一篇关于独居生活的文章",
             "帮我写个跑步入门指南",
@@ -605,7 +696,7 @@ function EmptyState({
             <button
               key={s}
               onClick={() => onQuickStart?.(s)}
-              className="text-[11px] px-2.5 py-1.5 rounded-full border border-app-border text-app-fg-muted hover:text-app-fg hover:border-app-fg-muted transition-colors"
+              className="text-[10.5px] px-2 py-1 rounded-full border border-app-border text-app-fg-muted hover:text-app-fg hover:border-app-fg-muted transition-colors"
             >
               {s}
             </button>
@@ -616,12 +707,12 @@ function EmptyState({
   }
 
   return (
-    <div className="text-xs text-app-fg-muted leading-relaxed mt-8 text-center">
+    <div className="text-[11px] text-app-fg-muted leading-relaxed mt-8 text-center">
       <div className="text-app-fg-subtle mb-2">
         点击输入框中{" "}
         <Plus size={10} className="inline -mt-0.5" /> 选择 Skill，或直接输入对话
       </div>
-      <div className="text-[11px]">
+      <div className="text-[10.5px]">
         选中编辑器文本后使用「扩写 / 改写」类 Skill 效果更佳
       </div>
     </div>
@@ -631,42 +722,75 @@ function EmptyState({
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] bg-blue-50 dark:bg-blue-950/30 text-app-fg rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
+      <div className="max-w-[85%] bg-app-surface-hover text-app-fg rounded-xl rounded-tr-sm px-2.5 py-1.5 text-[12.5px] leading-[1.55]">
         <div className="whitespace-pre-wrap break-words">{content}</div>
       </div>
     </div>
   );
 }
 
+type PillStyle = { label: string; emoji: string };
+
+const STEP_PILL: Record<AgentContentType, PillStyle | null> = {
+  "topic-options": { label: "选题方向", emoji: "📝" },
+  outline: { label: "大纲", emoji: "📋" },
+  article: { label: "草稿", emoji: "✍️" },
+  none: null,
+};
+
 function AssistantMessage({
   msg,
-  streaming,
-  isLast,
+  isStreaming,
   applied,
+  pendingChoice,
   inserting,
-  onApply,
+  onRequestApply,
+  onConfirmReplace,
+  onConfirmInsert,
+  onCancelApply,
   onCopy,
-  onExpand,
+  onGenerateDraft,
   onInsertImage,
 }: {
   msg: DisplayMessage;
-  streaming: boolean;
-  isLast: boolean;
+  isStreaming: boolean;
   applied: boolean;
+  pendingChoice: boolean;
   inserting: string | null;
-  onApply: (content: string) => void;
+  onRequestApply: (content: string) => void;
+  onConfirmReplace: (content: string) => void;
+  onConfirmInsert: (content: string) => void;
+  onCancelApply: () => void;
   onCopy: (content: string) => void;
-  onExpand: () => void;
+  onGenerateDraft: () => void;
   onInsertImage: (b64: string) => void;
 }) {
-  const contentType = React.useMemo(
-    () => (streaming ? "none" : detectContentType(msg.content)),
-    [msg.content, streaming]
+  // Don't classify a message that's still being written — wait for it to settle.
+  const contentType: AgentContentType = React.useMemo(
+    () => (isStreaming ? "none" : detectContentType(msg.content)),
+    [msg.content, isStreaming]
   );
-  const showActions = isLast && !streaming && contentType !== "none";
+  const pill = STEP_PILL[contentType];
+  // topic-options is a meta-decision (which angle to take), not document
+  // content — don't let users push it into the editor.
+  const isApplicable =
+    contentType === "outline" || contentType === "article";
+  const showActions = !isStreaming && contentType !== "none";
 
   return (
     <div className="max-w-[95%]">
+      {/* Step pill — neutral chip + horizontal separator. Step is signalled
+          by the emoji+label, not by color tinting. */}
+      {pill && (
+        <div className="mb-1.5 flex items-center gap-2">
+          <div className="inline-flex items-center gap-1 px-2 py-[2px] rounded border border-app-border bg-app-surface-hover text-app-fg text-[10.5px] font-semibold">
+            <span className="text-[10px]">{pill.emoji}</span>
+            <span>{pill.label}</span>
+          </div>
+          <div className="flex-1 border-t border-app-border/40" />
+        </div>
+      )}
+
       {/* Image */}
       {msg.imageB64 && (
         <div className="mb-2 rounded-lg overflow-hidden border border-app-border relative group">
@@ -695,30 +819,51 @@ function AssistantMessage({
 
       {/* Text content */}
       {msg.content && (
-        <div className="text-sm leading-relaxed text-app-fg whitespace-pre-wrap break-words">
+        <div className="text-[12.5px] leading-[1.65] text-app-fg whitespace-pre-wrap break-words">
           {msg.content}
         </div>
       )}
 
       {/* Streaming cursor */}
-      {!msg.content && !msg.imageB64 && streaming && (
-        <div className="text-sm text-app-fg-muted">▍</div>
+      {!msg.content && !msg.imageB64 && isStreaming && (
+        <div className="text-[12.5px] text-app-fg-muted">▍</div>
       )}
 
       {/* Action buttons */}
       {showActions && (
-        <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-app-border/50">
-          <ActionButton
-            icon={applied ? <Check size={12} /> : <FileEdit size={12} />}
-            label={applied ? "已应用" : "应用到编辑器"}
-            onClick={() => onApply(msg.content)}
-            active={applied}
-          />
-          {contentType === "outline" && !applied && (
+        <div className="flex flex-wrap gap-1 mt-2 pt-1.5 border-t border-app-border/50">
+          {isApplicable && !pendingChoice && (
+            <ActionButton
+              icon={applied ? <Check size={12} /> : <FileEdit size={12} />}
+              label={applied ? "已应用" : "应用到编辑器"}
+              onClick={() => onRequestApply(msg.content)}
+              active={applied}
+            />
+          )}
+          {isApplicable && pendingChoice && (
+            <>
+              <ActionButton
+                icon={<FileEdit size={12} />}
+                label="替换全部"
+                onClick={() => onConfirmReplace(msg.content)}
+              />
+              <ActionButton
+                icon={<Plus size={12} />}
+                label="插入到光标处"
+                onClick={() => onConfirmInsert(msg.content)}
+              />
+              <ActionButton
+                icon={<X size={12} />}
+                label="取消"
+                onClick={onCancelApply}
+              />
+            </>
+          )}
+          {contentType === "outline" && !pendingChoice && (
             <ActionButton
               icon={<Wand2 size={12} />}
-              label="开始扩写全文"
-              onClick={onExpand}
+              label="生成草稿"
+              onClick={onGenerateDraft}
             />
           )}
           <ActionButton
@@ -748,10 +893,10 @@ function ActionButton({
       onClick={onClick}
       disabled={active}
       className={cn(
-        "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors",
+        "flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10.5px] transition-colors border",
         active
-          ? "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400"
-          : "bg-app-surface-hover text-app-fg-muted hover:text-app-fg border border-app-border/50"
+          ? "bg-app-surface text-app-fg-subtle border-app-border/40 cursor-default"
+          : "bg-app-surface-hover text-app-fg-muted hover:text-app-fg border-app-border/50"
       )}
     >
       {icon}

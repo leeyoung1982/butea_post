@@ -20,16 +20,40 @@ export const ADMONITION_TYPES = [
   { type: "warning", label: "Warning", icon: "\u26A0\uFE0F" },
   { type: "danger", label: "Danger", icon: "\u{1F6D1}" },
   { type: "quote", label: "Quote", icon: "\u275D" },
+  // image-suggestion placeholder emitted by the writing agent. Stands out
+  // visually (pink/rose) so users can't miss it; stripped from publish
+  // output by lib/md/admonitions.ts with a count-based warning banner.
+  { type: "image", label: "\u914D\u56FE\u5EFA\u8BAE", icon: "\u{1F4F8}" },
 ] as const;
 
 export type AdmonitionType = (typeof ADMONITION_TYPES)[number]["type"];
 
-const CALLOUT_RE = /^\[!(\w+)\]\s*/;
+// Accept both English type ids (`image`) and Chinese names (`配图`) — Chinese
+// LLMs reliably emit Chinese tags but often refuse to switch to obscure
+// English types like `[!image]`.
+const CALLOUT_RE = /^\[!([\p{L}\w_-]+)\]\s*/u;
+
+/** Maps Chinese / alternate tag names to the canonical English type id. */
+const TYPE_ALIASES: Record<string, AdmonitionType> = {
+  配图: "image",
+  图片: "image",
+  插图: "image",
+  提示: "tip",
+  注意: "warning",
+  警告: "warning",
+  危险: "danger",
+  引用: "quote",
+  笔记: "note",
+  信息: "info",
+};
 
 const pluginKey = new PluginKey("admonitionDecoration");
 
 function getAdmonitionMeta(kind: string) {
-  return ADMONITION_TYPES.find((a) => a.type === kind) ?? ADMONITION_TYPES[0];
+  const normalized = TYPE_ALIASES[kind] ?? kind.toLowerCase();
+  return (
+    ADMONITION_TYPES.find((a) => a.type === normalized) ?? ADMONITION_TYPES[0]
+  );
 }
 
 export const AdmonitionDecoration = Extension.create({
@@ -159,5 +183,25 @@ ${root} .admonition-danger.admonition-has-body > p:first-child { border-bottom-c
 ${root} .admonition-quote { background: #fafafa; border-left-color: #a78bfa; }
 ${root} .admonition-quote .admonition-badge { color: #a78bfa; }
 ${root} .admonition-quote.admonition-has-body > p:first-child { border-bottom-color: rgba(167,139,250,0.2); }
+
+/* Image-suggestion: rose/pink, dashed border to signal "placeholder, not real
+ * content". The badge is promoted to a block-level header (instead of inline)
+ * so "配图建议" reads as a clear caption above the description, not a tiny
+ * inline prefix. */
+${root} .admonition-image {
+  background: #fdf2f8;
+  border-left: 4px dashed #ec4899;
+}
+${root} .admonition-image .admonition-badge {
+  display: block;
+  color: #be185d;
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(236, 72, 153, 0.35);
+}
+${root} .admonition-image.admonition-has-body > p:first-child { border-bottom-color: rgba(236,72,153,0.2); }
 `;
 }

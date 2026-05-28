@@ -71,13 +71,34 @@ export function withPrefs(base: string, prefs?: string): string {
 export { STRATEGY_INVISIBILITY };
 
 /** Image-suggestion marker: when AI generates body content, it should emit
- *  these markers between paragraphs where a visual would help. The marker
- *  syntax is an HTML comment so it's invisible in rendered output but easy
- *  for the user to spot in MD source and act on. */
+ *  these markers between paragraphs where a visual would help. We use the
+ *  Obsidian-style `[!image]` callout — it renders as a visually distinct
+ *  pink/dashed placeholder card in the editor so the user can't miss it,
+ *  and the publish pipeline strips these blocks (with a warning banner if
+ *  any remain unfulfilled). */
 export const IMAGE_SUGGESTION_RULE = `
-配图建议：在每个有强烈视觉感的小节后，插入一条配图建议，格式：
-<!-- 📸 配图建议：[一句话描述这里适合放什么图] -->
-不要每段都加，整篇 3-5 处为佳，只在真正能增强阅读的地方加。`;
+配图建议（必须严格按此格式，编辑器只认这一种语法）：
+
+在每个有强烈视觉感的位置后，插入一条配图建议占位。**类型标签必须写 \`配图\`（中文）**，不要用 \`note\`、\`tip\`、\`warning\` 等其他 callout 类型 —— 编辑器专门为配图占位定义了"配图"这个 callout 类型。
+
+✅ 正确格式（单行 blockquote，类型 = 配图）：
+> [!配图] 一双跑鞋放在办公桌旁的特写，背景是模糊的工位灯光
+> [!配图] 俯视镜头：城市夜跑路线在地图上画出心形轨迹
+
+❌ 错误示例 1（类型用了 note，系统会当成普通笔记，颜色和图标都不对）：
+> [!note] 一双跑鞋放在...
+
+❌ 错误示例 2（散文形式不是 callout，会被当成正文）：
+📸 配图建议：一双跑鞋...
+
+❌ 错误示例 3（HTML 注释肉眼完全不可见）：
+<!-- 配图建议：一双跑鞋... -->
+
+要点：
+- 类型标签写 \`配图\` 两个中文字符
+- 描述跟在 \`[!配图]\` 后面、同一行写完
+- 描述要具体（镜头视角、构图、情绪、色调），不要写"插一张相关的图"这种空话
+- 整篇 3-5 处为佳，只在真正能增强阅读的位置加`;
 
 export const SKILLS: Skill[] = [
   // ---------- 选题 ----------
