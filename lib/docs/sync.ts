@@ -242,7 +242,14 @@ export function DocSync() {
       const doc = await getDocument(activeDocId);
       if (!doc) return;
       doc.markdown = markdown;
-      doc.title = activeDocTitle || extractTitle(markdown) || "未命名文档";
+      const resolvedTitle = resolveTitle(activeDocTitle, markdown);
+      doc.title = resolvedTitle;
+      // Mirror the resolved title back into the store so subsequent autosaves
+      // see the up-to-date title (otherwise activeDocTitle would forever stay
+      // at its initial value and block H1-based auto-naming).
+      if (resolvedTitle !== activeDocTitle) {
+        setActiveDocTitle(resolvedTitle);
+      }
       doc.translations = translations;
       doc.useTranslation = useTranslation;
       doc.themeId = themeId;
@@ -288,7 +295,45 @@ function applyDocToStore(
   });
 }
 
+const TITLE_MAX_LEN = 80;
+const DEFAULT_TITLE = "未命名文档";
+
+/**
+ * Derive a sensible title from markdown content. Prefers the first H1; falls
+ * back to the first non-empty, non-markdown-noise line so docs whose users
+ * start typing without a `# heading` still get a meaningful name. Returns ""
+ * when no usable content is found.
+ */
 export function extractTitle(md: string): string {
-  const m = /^#\s+(.+)$/m.exec(md);
-  return m ? m[1].trim() : "";
+  const h1 = /^#\s+(.+)$/m.exec(md);
+  if (h1) return h1[1].trim().slice(0, TITLE_MAX_LEN);
+
+  for (const raw of md.split("\n")) {
+    const t = raw.trim();
+    if (!t) continue;
+    // Skip markdown noise that wouldn't read as a title
+    if (/^[#>\-*]/.test(t)) continue;
+    if (t.startsWith("```")) continue;
+    if (/^\d+\.\s/.test(t)) continue;
+    if (t.startsWith("<!--")) continue;
+    return t.slice(0, TITLE_MAX_LEN);
+  }
+  return "";
+}
+
+/**
+ * Compute the title to persist on autosave. The user's manual title wins,
+ * UNLESS it's still the default "未命名文档" placeholder — in that case the
+ * auto-extracted title takes over (which is what users naturally expect: type
+ * a heading or first line, see the doc name update).
+ */
+export function resolveTitle(
+  currentTitle: string,
+  markdown: string
+): string {
+  const trimmed = currentTitle.trim();
+  const extracted = extractTitle(markdown);
+  const isPlaceholder = !trimmed || trimmed === DEFAULT_TITLE;
+  if (isPlaceholder && extracted) return extracted;
+  return trimmed || extracted || DEFAULT_TITLE;
 }

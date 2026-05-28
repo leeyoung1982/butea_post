@@ -20,7 +20,12 @@ import {
 } from "lucide-react";
 import { SkillLibrary } from "./SkillLibrary";
 import { SettingsForm } from "./SettingsForm";
-import { useWorkshop, DEFAULT_MARKDOWN } from "@/lib/store";
+import {
+  useWorkshop,
+  DEFAULT_MARKDOWN,
+  type AiChatMessage,
+  type ChatMode,
+} from "@/lib/store";
 import {
   loadSettings,
   loadWritingPreferences,
@@ -42,12 +47,9 @@ import {
 import { insertAtCursor, insertBlockBelow } from "@/lib/editor-ref";
 import { cn } from "@/lib/utils";
 
-type ChatMode = "agent" | "free";
-
-type DisplayMessage = ChatMessage & {
-  id: string;
-  imageB64?: string;
-};
+// Alias preserved for readability inside this file; the real type lives in
+// lib/store.ts so the persisted chat history survives sidebar navigation.
+type DisplayMessage = AiChatMessage;
 
 export function ChatPanel() {
   const topic = useWorkshop((s) => s.topic);
@@ -58,18 +60,28 @@ export function ChatPanel() {
   const draft = useWorkshop((s) => s.markdown);
   const setMarkdown = useWorkshop((s) => s.setMarkdown);
 
+  // Chat state lives in the store so it persists across sidebar panel
+  // switches and page refresh. Transient UI/runtime state (settings dialog,
+  // streaming flag, abort controller, pending apply choice) stays local.
+  const messages = useWorkshop((s) => s.chatMessages);
+  const setMessages = useWorkshop((s) => s.setChatMessages);
+  const chatMode = useWorkshop((s) => s.chatMode);
+  const setChatMode = useWorkshop((s) => s.setChatMode);
+  const imageMode = useWorkshop((s) => s.chatImageMode);
+  const setImageMode = useWorkshop((s) => s.setChatImageMode);
+  const appliedIds = useWorkshop((s) => s.chatAppliedIds);
+  const setAppliedIds = useWorkshop((s) => s.setChatAppliedIds);
+  const clearChatState = useWorkshop((s) => s.clearChat);
+
   const [settings, setSettings] = React.useState<LLMSettings | null>(null);
   const [showSettings, setShowSettings] = React.useState(false);
-  const [chatMode, setChatMode] = React.useState<ChatMode>("agent");
-  const [messages, setMessages] = React.useState<DisplayMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [streaming, setStreaming] = React.useState(false);
   const [showSkills, setShowSkills] = React.useState(false);
-  const [imageMode, setImageMode] = React.useState(false);
   const [inserting, setInserting] = React.useState<string | null>(null);
-  const [appliedIds, setAppliedIds] = React.useState<Set<string>>(new Set());
-  // When user clicks apply but editor has content: show "replace / insert" choice
-  // on that specific message instead of immediately overwriting their work.
+  // When user clicks apply but editor has content: show "replace / insert"
+  // choice on that specific message instead of immediately overwriting.
+  // Transient — no reason to persist.
   const [pendingApplyId, setPendingApplyId] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -327,7 +339,7 @@ export function ChatPanel() {
   const requestApply = (msgId: string, content: string) => {
     if (isEditorEmpty(draft)) {
       setMarkdown(extractMarkdown(content));
-      setAppliedIds((prev) => new Set(prev).add(msgId));
+      setAppliedIds((prev) => (prev.includes(msgId) ? prev : [...prev, msgId]));
     } else {
       setPendingApplyId(msgId);
     }
@@ -335,13 +347,13 @@ export function ChatPanel() {
 
   const confirmReplace = (msgId: string, content: string) => {
     setMarkdown(extractMarkdown(content));
-    setAppliedIds((prev) => new Set(prev).add(msgId));
+    setAppliedIds((prev) => (prev.includes(msgId) ? prev : [...prev, msgId]));
     setPendingApplyId(null);
   };
 
   const confirmInsert = (msgId: string, content: string) => {
     insertBlockBelow(extractMarkdown(content));
-    setAppliedIds((prev) => new Set(prev).add(msgId));
+    setAppliedIds((prev) => (prev.includes(msgId) ? prev : [...prev, msgId]));
     setPendingApplyId(null);
   };
 
@@ -363,9 +375,7 @@ export function ChatPanel() {
 
   const stopStream = () => abortRef.current?.abort();
   const resetChat = () => {
-    setMessages([]);
-    setImageMode(false);
-    setAppliedIds(new Set());
+    clearChatState();
     setPendingApplyId(null);
   };
 
@@ -375,9 +385,9 @@ export function ChatPanel() {
       if (!confirm("切换模式会清空当前对话，确定？")) return;
     }
     setChatMode(mode);
-    setMessages([]);
-    setImageMode(false);
-    setAppliedIds(new Set());
+    clearChatState();
+    // setChatMode is intentionally called BEFORE clearChat so the new mode
+    // sticks (clearChat doesn't reset chatMode itself).
     setPendingApplyId(null);
   };
 
@@ -507,7 +517,7 @@ export function ChatPanel() {
                     <AssistantMessage
                       msg={m}
                       isStreaming={isCurrentlyStreaming}
-                      applied={appliedIds.has(m.id)}
+                      applied={appliedIds.includes(m.id)}
                       pendingChoice={pendingApplyId === m.id}
                       inserting={inserting}
                       onRequestApply={(content) => requestApply(m.id, content)}
@@ -623,7 +633,7 @@ export function ChatPanel() {
                 </button>
               )}
               <button
-                onClick={() => setImageMode((v) => !v)}
+                onClick={() => setImageMode(!imageMode)}
                 title="文生图"
                 className={cn(
                   "w-7 h-7 rounded-lg flex items-center justify-center transition-colors",

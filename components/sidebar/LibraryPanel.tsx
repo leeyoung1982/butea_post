@@ -13,6 +13,7 @@ import {
   Cloud,
   Plug,
   Inbox,
+  Pencil,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
@@ -23,6 +24,7 @@ import {
   listTrash,
   createDocument,
   moveToTrash,
+  renameDocument,
   restoreFromTrash,
   purgeFromTrash,
 } from "@/lib/docs/store";
@@ -231,6 +233,7 @@ function ComingSoon({ name, blurb }: { name: string; blurb: string }) {
 function LocalView() {
   const activeDocId = useWorkshop((s) => s.activeDocId);
   const setActiveDocId = useWorkshop((s) => s.setActiveDocId);
+  const setActiveDocTitle = useWorkshop((s) => s.setActiveDocTitle);
   const docListNonce = useWorkshop((s) => s.docListNonce);
   const bumpDocList = useWorkshop((s) => s.bumpDocList);
 
@@ -350,6 +353,15 @@ function LocalView() {
                 toast.info(`已切换到《${d.title || "未命名文档"}》`);
               }}
               onDelete={() => onDelete(d.id, d.title)}
+              onRename={async (newTitle) => {
+                const clean = newTitle.trim() || "未命名文档";
+                if (clean === d.title) return;
+                await renameDocument(d.id, clean);
+                // If this is the active doc, mirror the rename into the store
+                // so autosave doesn't echo the old title back over the rename.
+                if (d.id === activeDocId) setActiveDocTitle(clean);
+                bumpDocList();
+              }}
             />
           ))}
         </ul>
@@ -363,27 +375,79 @@ function DocRow({
   active,
   onOpen,
   onDelete,
+  onRename,
 }: {
   doc: ButeaDocument;
   active: boolean;
   onOpen: () => void;
   onDelete: () => void;
+  onRename: (newTitle: string) => void | Promise<void>;
 }) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(doc.title);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (!editing) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [editing]);
+
+  const startEdit = (e?: React.SyntheticEvent) => {
+    e?.stopPropagation();
+    setDraft(doc.title);
+    setEditing(true);
+  };
+  const commit = () => {
+    setEditing(false);
+    onRename(draft);
+  };
+  const cancel = () => {
+    setEditing(false);
+    setDraft(doc.title);
+  };
+
   return (
     <li
       className={cn(
-        "group flex items-start gap-2 px-3 py-2 border-l-2 hover:bg-app-surface-hover transition-colors cursor-pointer",
+        "group flex items-start gap-2 px-3 py-2 border-l-2 hover:bg-app-surface-hover transition-colors",
+        editing ? "cursor-default" : "cursor-pointer",
         active ? "border-app-fg bg-app-surface-hover" : "border-transparent"
       )}
-      onClick={onOpen}
+      onClick={editing ? undefined : onOpen}
     >
       <FileText size={13} className="text-app-fg-muted shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="text-xs font-medium text-app-fg truncate">
-            {doc.title || "未命名文档"}
-          </div>
-          {active && (
+          {editing ? (
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commit();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancel();
+                }
+              }}
+              className="flex-1 min-w-0 text-xs font-medium text-app-fg bg-app-bg border border-app-border rounded px-1.5 py-0.5 focus:outline-none focus:border-app-fg-muted"
+            />
+          ) : (
+            <div
+              className="text-xs font-medium text-app-fg truncate"
+              onDoubleClick={startEdit}
+              title="双击重命名"
+            >
+              {doc.title || "未命名文档"}
+            </div>
+          )}
+          {active && !editing && (
             <span
               className="shrink-0 inline-flex items-center gap-1 px-1.5 py-[1px] rounded-full text-[9px] uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900"
               title="此文档正在编辑器中打开"
@@ -407,16 +471,27 @@ function DocRow({
           )}
         </div>
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="opacity-0 group-hover:opacity-100 text-app-fg-subtle hover:text-red-600 p-0.5 transition-all shrink-0"
-        title="移到回收站"
-      >
-        <Trash2 size={11} />
-      </button>
+      {!editing && (
+        <>
+          <button
+            onClick={startEdit}
+            className="opacity-0 group-hover:opacity-100 text-app-fg-subtle hover:text-app-fg p-0.5 transition-all shrink-0"
+            title="重命名"
+          >
+            <Pencil size={11} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="opacity-0 group-hover:opacity-100 text-app-fg-subtle hover:text-red-600 p-0.5 transition-all shrink-0"
+            title="移到回收站"
+          >
+            <Trash2 size={11} />
+          </button>
+        </>
+      )}
     </li>
   );
 }

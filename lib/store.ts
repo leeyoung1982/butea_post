@@ -5,6 +5,20 @@ import { persist } from "zustand/middleware";
 import type { ThemeId, ThemeTokens } from "@/lib/themes/themes";
 import type { PlatformId } from "@/lib/adapters/types";
 
+export type ChatMode = "agent" | "free";
+
+/**
+ * AI 写作助手 single chat message as the UI sees it. The transient
+ * `imageB64` payload is intentionally NOT persisted (see partialize) to
+ * keep localStorage from blowing past quota when users generate images.
+ */
+export type AiChatMessage = {
+  id: string;
+  role: "system" | "user" | "assistant";
+  content: string;
+  imageB64?: string;
+};
+
 export const DEFAULT_MARKDOWN = `# Butea Studio
 
 > 不负每一份灵感 · Live up to every inspiration
@@ -83,6 +97,25 @@ export type DocumentState = {
 
   docListNonce: number;
   bumpDocList: () => void;
+
+  // -- AI 写作助手 chat state (persisted so it survives sidebar nav) --
+  chatMessages: AiChatMessage[];
+  setChatMessages: (
+    next: AiChatMessage[] | ((prev: AiChatMessage[]) => AiChatMessage[])
+  ) => void;
+
+  chatMode: ChatMode;
+  setChatMode: (m: ChatMode) => void;
+
+  chatImageMode: boolean;
+  setChatImageMode: (v: boolean) => void;
+
+  chatAppliedIds: string[];
+  setChatAppliedIds: (
+    next: string[] | ((prev: string[]) => string[])
+  ) => void;
+
+  clearChat: () => void;
 };
 
 export const useWorkshop = create<DocumentState>()(
@@ -184,10 +217,42 @@ export const useWorkshop = create<DocumentState>()(
 
       docListNonce: 0,
       bumpDocList: () => set((s) => ({ docListNonce: s.docListNonce + 1 })),
+
+      // AI 写作助手 chat state — lifted out of ChatPanel so that switching
+      // sidebar panels (or refreshing) doesn't drop the conversation.
+      chatMessages: [],
+      setChatMessages: (next) =>
+        set((s) => ({
+          chatMessages:
+            typeof next === "function" ? next(s.chatMessages) : next,
+        })),
+
+      chatMode: "agent",
+      setChatMode: (m) => {
+        if (get().chatMode === m) return;
+        set({ chatMode: m });
+      },
+
+      chatImageMode: false,
+      setChatImageMode: (v) => set({ chatImageMode: v }),
+
+      chatAppliedIds: [],
+      setChatAppliedIds: (next) =>
+        set((s) => ({
+          chatAppliedIds:
+            typeof next === "function" ? next(s.chatAppliedIds) : next,
+        })),
+
+      clearChat: () =>
+        set({
+          chatMessages: [],
+          chatImageMode: false,
+          chatAppliedIds: [],
+        }),
     }),
     {
       name: "butea:workshop",
-      version: 4,
+      version: 5,
       migrate: (persistedState: unknown, fromVersion: number) => {
         const state = (persistedState ?? {}) as Record<string, unknown>;
         if (fromVersion < 4) {
@@ -196,6 +261,8 @@ export const useWorkshop = create<DocumentState>()(
           delete state.viewport;
           delete state.sidebarPanel;
         }
+        // v5 introduces chatMessages / chatMode / chatImageMode / chatAppliedIds.
+        // Defaults are fine — no transform needed.
         return state as Partial<DocumentState>;
       },
       partialize: (s) => ({
@@ -207,6 +274,15 @@ export const useWorkshop = create<DocumentState>()(
         audience: s.audience,
         activeDocId: s.activeDocId,
         activeDocTitle: s.activeDocTitle,
+        // Strip imageB64 so generated-image base64 blobs don't push
+        // localStorage past quota. Text-only chat history survives reload;
+        // image previews are lost (acceptable — user can regenerate).
+        chatMessages: s.chatMessages.map(
+          ({ imageB64: _imageB64, ...rest }) => rest
+        ),
+        chatMode: s.chatMode,
+        chatImageMode: s.chatImageMode,
+        chatAppliedIds: s.chatAppliedIds,
       }),
     }
   )
