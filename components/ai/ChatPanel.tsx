@@ -495,6 +495,7 @@ export function ChatPanel() {
             onKeyDown={(e) => {
               if (
                 e.key === "Enter" &&
+                !e.nativeEvent.isComposing &&
                 !e.metaKey &&
                 !e.ctrlKey &&
                 !e.shiftKey
