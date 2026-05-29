@@ -1,4 +1,4 @@
-# Butea Post 开发手册
+# 享寫 开发手册
 
 ## 分支策略
 
@@ -184,12 +184,12 @@ export const myPlatformAdapter: Adapter = {
 
 | 数据 | 存储位置 | key |
 |------|----------|-----|
-| 文档 | IndexedDB | `butea` 数据库 |
-| 媒体文件 | IndexedDB | `butea` 数据库 |
-| 全局状态 | localStorage | `butea:workshop` |
-| 图床配置 | localStorage | `butea:image-host` |
-| Astro 配置 | localStorage | `butea:astro-blog` |
-| 自定义主题预设 | localStorage | `butea:custom-theme-presets` |
+| 文档 | IndexedDB | `butea-docs`（key 沿用旧前缀,保护存量用户数据） |
+| 媒体文件 | IndexedDB | `butea-media`（同上） |
+| 全局状态 | localStorage | `butea:workshop`（同上） |
+| 图床配置 | localStorage | `butea:image-host`（同上） |
+| Astro 配置 | localStorage | `butea:astro-blog`（同上） |
+| 自定义主题预设 | localStorage | `butea:custom-theme-presets`（同上） |
 
 > 所有数据在浏览器本地，不同域名（localhost vs vercel）的数据完全隔离。
 

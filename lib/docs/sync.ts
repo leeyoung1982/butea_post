@@ -9,35 +9,29 @@ import {
   putDocument,
   purgeExpiredTrash,
 } from "./store";
-import { seedStarterAsset, deleteMedia } from "@/lib/media/store";
+import { deleteMedia } from "@/lib/media/store";
 import { STARTER_DOCS } from "@/lib/starter";
 import type { ButeaDocument } from "./types";
 
-// Starter media ids — the welcome doc references these as
-// `butea-media://<id>`, so they must match exactly.
-const STARTER_TREE_ID = "butea-tree";
-const STARTER_FLOWER_ID = "butea-flower";
+// Stale media ids from earlier versions. Current starter docs don't reference
+// any seeded assets; this only cleans up orphaned references in older user
+// docs (so the assets get deleted from IDB instead of lingering forever).
+const STALE_IMAGE_IDS = ["butea-studio-tree", "butea-tree", "butea-flower"];
 
-// Stale media ids from earlier versions. The current welcome doc no longer
-// references them; if any user doc still does, we rewrite it on bootstrap.
-const STALE_IMAGE_IDS: Record<string, string> = {
-  // v0.4 → v0.5 rename: previously a single starter asset with the wrong
-  // content (flower) was seeded under "butea-studio-tree"; split into the
-  // correct tree + flower assets with new ids
-  "butea-studio-tree": STARTER_TREE_ID,
-};
-
-/** One-time migration of in-IDB docs that reference renamed/stale image
- *  ids. Rewrites markdown in-place and deletes the orphaned asset. */
+/** One-time migration: strip references to seeded starter assets that no
+ *  longer exist (their PNGs were removed in the brand pivot). Also deletes
+ *  the orphaned blobs from IDB so they stop wasting quota. */
 async function migrateStaleImageRefs(): Promise<void> {
   const docs = await listDocuments().catch(() => [] as ButeaDocument[]);
   for (const doc of docs) {
     let md = doc.markdown;
     let changed = false;
-    for (const [oldId, newId] of Object.entries(STALE_IMAGE_IDS)) {
-      const re = new RegExp(`butea-media:\\/\\/${oldId}\\b`, "g");
-      if (re.test(md)) {
-        md = md.replace(re, `butea-media://${newId}`);
+    for (const oldId of STALE_IMAGE_IDS) {
+      // Remove standalone image lines AND inline markdown image refs.
+      // Pattern: ![alt](butea-media://<id>) → empty
+      const inline = new RegExp(`!\\[[^\\]]*\\]\\(butea-media:\\/\\/${oldId}\\)`, "g");
+      if (inline.test(md)) {
+        md = md.replace(inline, "");
         changed = true;
       }
     }
@@ -47,8 +41,7 @@ async function migrateStaleImageRefs(): Promise<void> {
       await putDocument(doc).catch(() => {});
     }
   }
-  // Best-effort cleanup of the orphaned old assets.
-  for (const oldId of Object.keys(STALE_IMAGE_IDS)) {
+  for (const oldId of STALE_IMAGE_IDS) {
     await deleteMedia(oldId).catch(() => {});
   }
 }
@@ -96,24 +89,8 @@ export function DocSync() {
       // Best-effort housekeeping
       purgeExpiredTrash().catch(() => {});
 
-      // Seed starter assets before any doc-load path so the welcome doc's
-      // `butea-media://<id>` references resolve on first paint.
-      await Promise.all([
-        seedStarterAsset({
-          id: STARTER_TREE_ID,
-          publicUrl: "/butea-studio-tree.png",
-          name: "Butea Studio · 紫矿树.png",
-        }),
-        seedStarterAsset({
-          id: STARTER_FLOWER_ID,
-          publicUrl: "/butea-studio-flower.png",
-          name: "Butea Studio · 紫矿花.png",
-        }),
-      ]).catch(() => {});
-
-      // Migrate any existing docs whose markdown still references stale
-      // image ids from earlier versions. Runs after seeding so the rewrite
-      // targets are guaranteed to exist in IDB.
+      // Strip references to seeded starter assets that no longer exist
+      // (their PNGs were dropped in the brand pivot).
       await migrateStaleImageRefs().catch(() => {});
 
       if (activeDocId) {

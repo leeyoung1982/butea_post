@@ -1,12 +1,12 @@
 {
-  "name": "butea",
+  "name": "xiangxie",
   "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "node -e \"if (process.platform === 'darwin') { try { require('child_process').execSync('xattr -dr com.apple.quarantine node_modules', {stdio:'ignore'}); require('fs').writeFileSync('node_modules/.metadata_never_index',''); require('fs').mkdirSync('.next', {recursive:true}); require('fs').writeFileSync('.next/.metadata_never_index',''); console.log('[butea] macOS: stripped quarantine + marked node_modules no-index'); } catch(e) {} }\""
+    "postinstall": "node -e \"if (process.platform === 'darwin') { try { require('child_process').execSync('xattr -dr com.apple.quarantine node_modules', {stdio:'ignore'}); require('fs').writeFileSync('node_modules/.metadata_never_index',''); require('fs').mkdirSync('.next', {recursive:true}); require('fs').writeFileSync('.next/.metadata_never_index',''); console.log('[xiangxie] macOS: stripped quarantine + marked node_modules no-index'); } catch(e) {} }\""
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

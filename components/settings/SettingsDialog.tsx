@@ -119,7 +119,7 @@ function AboutSection() {
   return (
     <div className="text-xs space-y-3 text-app-fg-muted leading-relaxed">
       <div>
-        <div className="text-[13px] font-semibold text-app-fg">Butea</div>
+        <div className="text-[13px] font-semibold text-app-fg">享寫</div>
         <div className="text-[11px] text-app-fg-muted italic">
           Rooted ideas, Branching out.
         </div>

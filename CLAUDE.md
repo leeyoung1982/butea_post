@@ -6,7 +6,7 @@
 
 ## 项目身份
 
-**Butea Post** — 一个**纯前端**的沉浸式写作 + 多平台发布工具。
+**享寫**（原名 Butea Post）— 一个**纯前端**的沉浸式中文写作编辑器 + 多平台发布工具。
 
 - 没有服务器、没有数据库、没有用户系统、没有 `.env`。
 - 用户内容、API key、配置全部在浏览器（IndexedDB + localStorage）。
@@ -18,7 +18,7 @@
 
 ## 不要做的事
 
-1. **不要引入服务端存储**（数据库、KV、Blob）。这是设计原则，不是技术限制。Butea 的卖点就是"内容永远在你浏览器里"。
+1. **不要引入服务端存储**（数据库、KV、Blob）。这是设计原则，不是技术限制。享寫的卖点就是"内容永远在你浏览器里"。
 2. **不要恢复双栏 / 分屏 / 双模式编辑器**。当前是单一 TipTap 沉浸式编辑器（CodeMirror 已被移除，`lib/editor-ref.ts` 还留有一些 legacy CM6 shim 仅为兼容）。源码模式是一个 toggle，不是第二个 pane。
 3. **不要在 `.env` 中放 API key**。所有 key 走前端设置 → localStorage。如果某个新功能"需要后端密钥"，先停下来和用户讨论方案。
 4. **不要把"副驾驶"作为称呼**。统一叫 **"AI 写作助手"**（2026-05 已重命名）。
@@ -32,20 +32,22 @@
 
 ### 语言
 
-- **UI 字符串用中文** —— Butea 的目标读者是中文创作者，这是产品决策不是个人偏好。
+- **UI 字符串用中文** —— 享寫的目标读者是中文创作者，这是产品决策不是个人偏好。
 - （代码注释/汇报语言等通用偏好见 `~/.claude/CLAUDE.md`。）
 
 ### 状态与存储
 
 | 数据 | 位置 | Key |
 |------|------|-----|
-| 全局 UI 状态（当前文档、主题、侧边栏） | localStorage | `butea:workshop`（zustand persist，version 4） |
+| 全局 UI 状态（当前文档、主题、侧边栏） | localStorage | `butea:workshop`（zustand persist，version 6） |
 | LLM/图片 provider 设置 | localStorage | `claude-wechat-llm:settings` |
 | 图床配置 | localStorage | `butea:image-host` |
 | Astro 博客配置 | localStorage | `butea:astro-blog` |
 | 自定义主题预设 | localStorage | `butea:custom-theme-presets` |
 | 文档正文 + 快照 + 回收站 | IndexedDB `butea-docs` |  |
 | 图片二进制 | IndexedDB `butea-media` | URL scheme: `butea-media://<id>` |
+
+> ⚠️ **存储 key 沿用旧的 `butea:` / `butea-` 前缀**，是因为存量用户的浏览器里有真实数据，改前缀=丢稿子。代码里看到 `butea` 前缀的持久化 key，**不要重命名**。
 
 **改动 store schema 时**，记得 bump `version` 并写 migration —— 用户的浏览器里有真实数据，破坏性变更会让他们丢稿子。
 

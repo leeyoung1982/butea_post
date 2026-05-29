@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Butea — 不负每一份灵感",
+  title: "享寫 — 沉浸式中文写作编辑器",
   description:
-    "AI 原生的开源内容创作 OS。一份草稿,适配每个平台 —— 公众号 / 博客 / X / 小红书 / 微博 / 朋友圈,改结构、改语气、改排版,不动语言。BYOK,对接 Obsidian。Live up to every inspiration.",
+    "为中文创作者而生的沉浸式写作工具。一份草稿,AI 原生改写到公众号 / 博客 / X / 小红书 / 微博 / 朋友圈。BYOK,支持 Obsidian 互通,纯前端。",
 };
 
 export default function RootLayout({

@@ -130,7 +130,7 @@ export const THEMES: ArticleTheme[] = [
   {
     id: "butea",
     name: "紫矿",
-    tagline: "本品牌主题·暖紫·东方现代",
+    tagline: "享寫品牌主题·暖紫·东方现代",
     swatch: ["#6B2737", "#EA580C", "#FEF7ED"],
     isDark: false,
     category: "color",

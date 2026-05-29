@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const res = await fetch(target.toString(), {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; Butea/0.3; +https://github.com/butea)",
+          "Mozilla/5.0 (compatible; Xiangxie/0.3; +https://github.com/leeyoung1982/butea_post)",
         Accept: "text/html,application/xhtml+xml",
       },
       // Hard-limit upstream time so the edge function returns promptly.

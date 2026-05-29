@@ -19,9 +19,9 @@ export type AiChatMessage = {
   imageB64?: string;
 };
 
-export const DEFAULT_MARKDOWN = `# Butea Studio
+export const DEFAULT_MARKDOWN = `# 享寫
 
-> 不负每一份灵感 · Live up to every inspiration
+> 不负每一份灵感
 
 开始写作吧。
 `;

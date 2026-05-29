@@ -11,6 +11,7 @@ import {
   BookOpen,
   PanelLeftClose,
 } from "lucide-react";
+import Image from "next/image";
 import { VisualEditor } from "@/components/editor/VisualEditor";
 import { ChatPanel } from "@/components/ai/ChatPanel";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
@@ -20,7 +21,6 @@ import { AssetsPanel } from "@/components/sidebar/AssetsPanel";
 import { ObsidianPanel } from "@/components/sidebar/ObsidianPanel";
 import { PublishCenter } from "@/components/publish/PublishCenter";
 import { DocSync } from "@/lib/docs/sync";
-import { ButeaLogo } from "@/components/brand/ButeaLogo";
 import { useWorkshop } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -42,14 +42,16 @@ export function Workspace() {
       <header className="h-10 shrink-0 border-b border-app-border flex items-center justify-between px-2.5 bg-app-surface">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-1.5 px-1">
-            <ButeaLogo
-              size={18}
-              leafColor="#EA580C"
-              nibColor="#0A0A0A"
+            <Image
+              src="/logo-type.png"
+              alt="享寫"
+              width={22}
+              height={22}
               className="shrink-0"
+              priority
             />
             <span className="text-[13px] font-semibold tracking-tight">
-              Butea
+              享寫
             </span>
           </div>
           <div className="h-3.5 w-px bg-app-border" />

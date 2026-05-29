@@ -1,6 +1,6 @@
 export const TITLE = "功能介绍";
 
-export const MARKDOWN = `# Butea Post 功能介绍
+export const MARKDOWN = `# 享寫 功能介绍
 
 > [!info] 这篇文档是各项功能的完整参考。
 > 建议先通读一遍，需要时再回来查找。
@@ -36,7 +36,7 @@ export const MARKDOWN = `# Butea Post 功能介绍
 
 \`主题▾\` 按钮提供三个 tab：
 
-- **配色** — 7 种基础配色（Butea、Mist、Ink、Sky、Forest、Dawn、Terminal）
+- **配色** — 7 种基础配色（紫矿、Mist、Ink、Sky、Forest、Dawn、Terminal）
 - **风格** — 10 种风格主题（GitHub、Medium、Notion、知乎、少数派、竹白、Substack、微信读书、Brutalist、Muji）
 - **自定义** — 完整的自定义主题编辑器，可保存/加载预设
 
