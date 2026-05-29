@@ -98,8 +98,10 @@ export type DocumentState = {
   docListNonce: number;
   bumpDocList: () => void;
 
-  // -- AI 写作助手 chat state (persisted so it survives sidebar nav) --
-  chatMessages: AiChatMessage[];
+  // -- AI 写作助手 chat state (per-mode so switching tabs preserves each
+  //    tab's history independently; persisted across sidebar nav + reload) --
+  chatHistories: Record<ChatMode, AiChatMessage[]>;
+  /** Get / set the message list of the currently active mode. */
   setChatMessages: (
     next: AiChatMessage[] | ((prev: AiChatMessage[]) => AiChatMessage[])
   ) => void;
@@ -110,11 +112,14 @@ export type DocumentState = {
   chatImageMode: boolean;
   setChatImageMode: (v: boolean) => void;
 
-  chatAppliedIds: string[];
+  chatAppliedIdsByMode: Record<ChatMode, string[]>;
+  /** Get / set applied-message ids of the currently active mode. */
   setChatAppliedIds: (
     next: string[] | ((prev: string[]) => string[])
   ) => void;
 
+  /** Clear only the currently active mode's conversation; the other mode's
+   *  history is left untouched. */
   clearChat: () => void;
 };
 
@@ -218,14 +223,19 @@ export const useWorkshop = create<DocumentState>()(
       docListNonce: 0,
       bumpDocList: () => set((s) => ({ docListNonce: s.docListNonce + 1 })),
 
-      // AI 写作助手 chat state — lifted out of ChatPanel so that switching
-      // sidebar panels (or refreshing) doesn't drop the conversation.
-      chatMessages: [],
+      // AI 写作助手 chat state — per-mode buckets so switching tabs keeps
+      // each mode's history intact, and persisted so reload / sidebar nav
+      // doesn't drop the conversation either.
+      chatHistories: { agent: [], free: [] },
       setChatMessages: (next) =>
-        set((s) => ({
-          chatMessages:
-            typeof next === "function" ? next(s.chatMessages) : next,
-        })),
+        set((s) => {
+          const cur = s.chatHistories[s.chatMode];
+          const updated = typeof next === "function" ? next(cur) : next;
+          if (updated === cur) return {};
+          return {
+            chatHistories: { ...s.chatHistories, [s.chatMode]: updated },
+          };
+        }),
 
       chatMode: "agent",
       setChatMode: (m) => {
@@ -236,23 +246,30 @@ export const useWorkshop = create<DocumentState>()(
       chatImageMode: false,
       setChatImageMode: (v) => set({ chatImageMode: v }),
 
-      chatAppliedIds: [],
+      chatAppliedIdsByMode: { agent: [], free: [] },
       setChatAppliedIds: (next) =>
-        set((s) => ({
-          chatAppliedIds:
-            typeof next === "function" ? next(s.chatAppliedIds) : next,
-        })),
+        set((s) => {
+          const cur = s.chatAppliedIdsByMode[s.chatMode];
+          const updated = typeof next === "function" ? next(cur) : next;
+          if (updated === cur) return {};
+          return {
+            chatAppliedIdsByMode: {
+              ...s.chatAppliedIdsByMode,
+              [s.chatMode]: updated,
+            },
+          };
+        }),
 
       clearChat: () =>
-        set({
-          chatMessages: [],
+        set((s) => ({
+          chatHistories: { ...s.chatHistories, [s.chatMode]: [] },
+          chatAppliedIdsByMode: { ...s.chatAppliedIdsByMode, [s.chatMode]: [] },
           chatImageMode: false,
-          chatAppliedIds: [],
-        }),
+        })),
     }),
     {
       name: "butea:workshop",
-      version: 5,
+      version: 6,
       migrate: (persistedState: unknown, fromVersion: number) => {
         const state = (persistedState ?? {}) as Record<string, unknown>;
         if (fromVersion < 4) {
@@ -261,8 +278,24 @@ export const useWorkshop = create<DocumentState>()(
           delete state.viewport;
           delete state.sidebarPanel;
         }
-        // v5 introduces chatMessages / chatMode / chatImageMode / chatAppliedIds.
-        // Defaults are fine — no transform needed.
+        if (fromVersion < 6) {
+          // v6: split the single chat history into per-mode buckets so the
+          // two tabs (agent / free) keep their own conversations. Park any
+          // pre-existing chat under whichever mode was active at save time.
+          const oldMessages = (state.chatMessages as unknown[]) ?? [];
+          const oldApplied = (state.chatAppliedIds as string[]) ?? [];
+          const mode = (state.chatMode as ChatMode) ?? "agent";
+          state.chatHistories = {
+            agent: mode === "agent" ? oldMessages : [],
+            free: mode === "free" ? oldMessages : [],
+          };
+          state.chatAppliedIdsByMode = {
+            agent: mode === "agent" ? oldApplied : [],
+            free: mode === "free" ? oldApplied : [],
+          };
+          delete state.chatMessages;
+          delete state.chatAppliedIds;
+        }
         return state as Partial<DocumentState>;
       },
       partialize: (s) => ({
@@ -277,12 +310,17 @@ export const useWorkshop = create<DocumentState>()(
         // Strip imageB64 so generated-image base64 blobs don't push
         // localStorage past quota. Text-only chat history survives reload;
         // image previews are lost (acceptable — user can regenerate).
-        chatMessages: s.chatMessages.map(
-          ({ imageB64: _imageB64, ...rest }) => rest
-        ),
+        chatHistories: {
+          agent: s.chatHistories.agent.map(
+            ({ imageB64: _imageB64, ...rest }) => rest
+          ),
+          free: s.chatHistories.free.map(
+            ({ imageB64: _imageB64, ...rest }) => rest
+          ),
+        },
         chatMode: s.chatMode,
         chatImageMode: s.chatImageMode,
-        chatAppliedIds: s.chatAppliedIds,
+        chatAppliedIdsByMode: s.chatAppliedIdsByMode,
       }),
     }
   )

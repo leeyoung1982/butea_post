@@ -61,15 +61,18 @@ export function ChatPanel() {
   const setMarkdown = useWorkshop((s) => s.setMarkdown);
 
   // Chat state lives in the store so it persists across sidebar panel
-  // switches and page refresh. Transient UI/runtime state (settings dialog,
-  // streaming flag, abort controller, pending apply choice) stays local.
-  const messages = useWorkshop((s) => s.chatMessages);
-  const setMessages = useWorkshop((s) => s.setChatMessages);
+  // switches, page refresh, AND tab switches (agent / free each keep their
+  // own history). Transient UI/runtime state (settings dialog, streaming
+  // flag, abort controller, pending apply choice) stays local.
   const chatMode = useWorkshop((s) => s.chatMode);
   const setChatMode = useWorkshop((s) => s.setChatMode);
+  // Subscribe to ONLY the current mode's slice so component re-renders
+  // when the active conversation changes, not when the inactive one does.
+  const messages = useWorkshop((s) => s.chatHistories[s.chatMode]);
+  const setMessages = useWorkshop((s) => s.setChatMessages);
   const imageMode = useWorkshop((s) => s.chatImageMode);
   const setImageMode = useWorkshop((s) => s.setChatImageMode);
-  const appliedIds = useWorkshop((s) => s.chatAppliedIds);
+  const appliedIds = useWorkshop((s) => s.chatAppliedIdsByMode[s.chatMode]);
   const setAppliedIds = useWorkshop((s) => s.setChatAppliedIds);
   const clearChatState = useWorkshop((s) => s.clearChat);
 
@@ -381,13 +384,8 @@ export function ChatPanel() {
 
   const switchMode = (mode: ChatMode) => {
     if (mode === chatMode) return;
-    if (messages.length > 0) {
-      if (!confirm("切换模式会清空当前对话，确定？")) return;
-    }
+    // Each mode keeps its own chat history now — just switch, don't clear.
     setChatMode(mode);
-    clearChatState();
-    // setChatMode is intentionally called BEFORE clearChat so the new mode
-    // sticks (clearChat doesn't reset chatMode itself).
     setPendingApplyId(null);
   };
 
