@@ -145,7 +145,7 @@ export function AIImageDialog({
                 : "一张说明这一段的配图。"
             }
             rows={3}
-            className="w-full px-3 py-2 rounded-md border border-app-border bg-app-bg text-sm placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
+            className="w-full px-3 py-2 rounded-md border border-app-border bg-app-bg text-xs placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
           />
         </Field>
 
@@ -237,7 +237,7 @@ export function AIImageDialog({
         </div>
 
         {error && (
-          <div className="px-3 py-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded text-[12px] text-red-700 dark:text-red-400">
+          <div className="px-3 py-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded text-xs text-red-700 dark:text-red-400">
             ⚠ {error}
           </div>
         )}
@@ -261,7 +261,7 @@ export function AIImageDialog({
                     className="w-full h-auto"
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <span className="bg-white text-black px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5">
+                    <span className="bg-white text-black px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5">
                       <Check size={13} /> 插入到{mode === "cover" ? "封面" : "正文"}
                     </span>
                   </div>

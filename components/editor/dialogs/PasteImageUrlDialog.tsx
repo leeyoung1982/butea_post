@@ -76,7 +76,7 @@ export function PasteImageUrlDialog({
               setPreviewOk(null);
             }}
             placeholder="https://..."
-            className="mt-1 w-full h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-sm font-mono placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
+            className="mt-1 w-full h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-xs font-mono placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
             autoFocus
           />
         </label>
@@ -88,7 +88,7 @@ export function PasteImageUrlDialog({
             value={alt}
             onChange={(e) => setAlt(e.target.value)}
             placeholder="图片描述"
-            className="mt-1 w-full h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-sm placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
+            className="mt-1 w-full h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-xs placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
           />
         </label>
 

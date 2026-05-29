@@ -45,7 +45,7 @@ export function EmptyState({
       <div
         className={cn(
           "font-medium text-app-fg",
-          density === "compact" ? "text-xs" : "text-sm"
+          density === "compact" ? "text-xs" : "text-[13px]"
         )}
       >
         {title}

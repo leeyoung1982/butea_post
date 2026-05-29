@@ -116,7 +116,7 @@ export function ExportDialog({
     >
       <div className="p-5 space-y-5">
         {!output ? (
-          <div className="text-sm text-app-fg-muted">生成中…</div>
+          <div className="text-xs text-app-fg-muted">生成中…</div>
         ) : output.kind === "html" ? (
           <HtmlExportSection
             html={output.html}
@@ -243,7 +243,7 @@ function ThreadExportSection(props: {
         {props.output.posts.map((p) => (
           <div
             key={p.index}
-            className="bg-app-bg border border-app-border rounded-md p-3 text-sm"
+            className="bg-app-bg border border-app-border rounded-md p-3 text-xs"
           >
             <div className="flex items-center justify-between mb-1.5 text-xs text-app-fg-muted">
               <span>#{p.index}</span>
@@ -285,7 +285,7 @@ function CardsExportSection(props: {
     <>
       <Section title="标题">
         <div className="flex items-center justify-between gap-2 bg-app-bg border border-app-border rounded-md p-3">
-          <span className="text-sm">{props.output.title}</span>
+          <span className="text-xs">{props.output.title}</span>
           <Button size="sm" variant="ghost" onClick={props.onCopyTitle}>
             {props.copied === "title" ? <Check size={12} /> : <Copy size={12} />}
           </Button>
@@ -293,14 +293,14 @@ function CardsExportSection(props: {
       </Section>
       <Section title="标签" hint="3-5 个为佳">
         <div className="flex items-center justify-between gap-2 bg-app-bg border border-app-border rounded-md p-3">
-          <span className="text-sm">{props.output.tags.map((t) => `#${t}`).join(" ")}</span>
+          <span className="text-xs">{props.output.tags.map((t) => `#${t}`).join(" ")}</span>
           <Button size="sm" variant="ghost" onClick={props.onCopyTags}>
             {props.copied === "tags" ? <Check size={12} /> : <Copy size={12} />}
           </Button>
         </div>
       </Section>
       <Section title="正文">
-        <div className="bg-app-bg border border-app-border rounded-md p-3 text-sm whitespace-pre-wrap max-h-[250px] overflow-auto">
+        <div className="bg-app-bg border border-app-border rounded-md p-3 text-xs whitespace-pre-wrap max-h-[250px] overflow-auto">
           {props.output.body}
         </div>
         <div className="mt-2">
@@ -341,7 +341,7 @@ function SummaryExportSection(props: {
 }) {
   return (
     <Section title="短文本">
-      <div className="bg-app-bg border border-app-border rounded-md p-3 text-sm whitespace-pre-wrap mb-2">
+      <div className="bg-app-bg border border-app-border rounded-md p-3 text-xs whitespace-pre-wrap mb-2">
         {props.output.text}
       </div>
       <Button onClick={props.onCopy}>
@@ -366,7 +366,7 @@ function Section({
       <div className="text-xs uppercase tracking-wider text-app-fg-subtle mb-2">
         {title}
       </div>
-      {hint && <div className="text-[12px] text-app-fg-muted mb-2.5">{hint}</div>}
+      {hint && <div className="text-xs text-app-fg-muted mb-2.5">{hint}</div>}
       {children}
     </div>
   );

@@ -59,6 +59,7 @@ export function ChatPanel() {
   const selection = useWorkshop((s) => s.selection);
   const draft = useWorkshop((s) => s.markdown);
   const setMarkdown = useWorkshop((s) => s.setMarkdown);
+  const setSidebarPanel = useWorkshop((s) => s.setSidebarPanel);
 
   // Chat state lives in the store so it persists across sidebar panel
   // switches, page refresh, AND tab switches (agent / free each keep their
@@ -339,10 +340,20 @@ export function ChatPanel() {
     return false;
   };
 
+  // After an apply, if the agent's content was an outline jump the user to
+  // 本篇 so they immediately see the outline list they just imported. For
+  // article apply we stay put — the editor is visible regardless.
+  const maybeJumpToCurrent = (content: string) => {
+    if (detectContentType(content) === "outline") {
+      setSidebarPanel("current");
+    }
+  };
+
   const requestApply = (msgId: string, content: string) => {
     if (isEditorEmpty(draft)) {
       setMarkdown(extractMarkdown(content));
       setAppliedIds((prev) => (prev.includes(msgId) ? prev : [...prev, msgId]));
+      maybeJumpToCurrent(content);
     } else {
       setPendingApplyId(msgId);
     }
@@ -352,12 +363,14 @@ export function ChatPanel() {
     setMarkdown(extractMarkdown(content));
     setAppliedIds((prev) => (prev.includes(msgId) ? prev : [...prev, msgId]));
     setPendingApplyId(null);
+    maybeJumpToCurrent(content);
   };
 
   const confirmInsert = (msgId: string, content: string) => {
     insertBlockBelow(extractMarkdown(content));
     setAppliedIds((prev) => (prev.includes(msgId) ? prev : [...prev, msgId]));
     setPendingApplyId(null);
+    maybeJumpToCurrent(content);
   };
 
   const cancelApply = () => setPendingApplyId(null);
@@ -400,7 +413,7 @@ export function ChatPanel() {
           >
             <ArrowLeft size={16} />
           </button>
-          <span className="text-xs font-medium text-app-fg">
+          <span className="text-[13px] font-semibold text-app-fg">
             写作偏好 & LLM 配置
           </span>
         </div>
@@ -424,7 +437,7 @@ export function ChatPanel() {
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-app-border">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-app-fg">
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-app-fg">
             <Sparkles size={13} /> AI 写作助手
           </div>
           <div className="flex items-center gap-1">
@@ -611,7 +624,7 @@ export function ChatPanel() {
                   : "今天想写点什么？"
             }
             rows={1}
-            className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[12.5px] placeholder:text-app-fg-subtle focus:outline-none min-h-[36px]"
+            className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-xs placeholder:text-app-fg-subtle focus:outline-none min-h-[36px]"
           />
 
           <div className="flex items-center justify-between px-2 pb-2">
@@ -691,7 +704,7 @@ function EmptyState({
         <div className="w-9 h-9 rounded-full bg-app-surface-hover flex items-center justify-center mx-auto">
           <PenTool size={16} className="text-app-fg-muted" />
         </div>
-        <div className="text-[12.5px] text-app-fg font-medium">从零开始写一篇文章</div>
+        <div className="text-xs text-app-fg font-medium">从零开始写一篇文章</div>
         <div className="text-[11px] text-app-fg-muted leading-relaxed max-w-[220px] mx-auto">
           告诉我你想写什么，我会引导你完成选题、大纲、到草稿的整个过程
         </div>
@@ -704,7 +717,7 @@ function EmptyState({
             <button
               key={s}
               onClick={() => onQuickStart?.(s)}
-              className="text-[10.5px] px-2 py-1 rounded-full border border-app-border text-app-fg-muted hover:text-app-fg hover:border-app-fg-muted transition-colors"
+              className="text-[10px] px-2 py-1 rounded-full border border-app-border text-app-fg-muted hover:text-app-fg hover:border-app-fg-muted transition-colors"
             >
               {s}
             </button>
@@ -720,7 +733,7 @@ function EmptyState({
         点击输入框中{" "}
         <Plus size={10} className="inline -mt-0.5" /> 选择 Skill，或直接输入对话
       </div>
-      <div className="text-[10.5px]">
+      <div className="text-[10px]">
         选中编辑器文本后使用「扩写 / 改写」类 Skill 效果更佳
       </div>
     </div>
@@ -730,7 +743,7 @@ function EmptyState({
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] bg-app-surface-hover text-app-fg rounded-xl rounded-tr-sm px-2.5 py-1.5 text-[12.5px] leading-[1.55]">
+      <div className="max-w-[85%] bg-app-surface-hover text-app-fg rounded-xl rounded-tr-sm px-2.5 py-1.5 text-xs leading-[1.55]">
         <div className="whitespace-pre-wrap break-words">{content}</div>
       </div>
     </div>
@@ -791,7 +804,7 @@ function AssistantMessage({
           by the emoji+label, not by color tinting. */}
       {pill && (
         <div className="mb-1.5 flex items-center gap-2">
-          <div className="inline-flex items-center gap-1 px-2 py-[2px] rounded border border-app-border bg-app-surface-hover text-app-fg text-[10.5px] font-semibold">
+          <div className="inline-flex items-center gap-1 px-2 py-[2px] rounded border border-app-border bg-app-surface-hover text-app-fg text-[10px] font-semibold">
             <span className="text-[10px]">{pill.emoji}</span>
             <span>{pill.label}</span>
           </div>
@@ -827,14 +840,14 @@ function AssistantMessage({
 
       {/* Text content */}
       {msg.content && (
-        <div className="text-[12.5px] leading-[1.65] text-app-fg whitespace-pre-wrap break-words">
+        <div className="text-xs leading-[1.65] text-app-fg whitespace-pre-wrap break-words">
           {msg.content}
         </div>
       )}
 
       {/* Streaming cursor */}
       {!msg.content && !msg.imageB64 && isStreaming && (
-        <div className="text-[12.5px] text-app-fg-muted">▍</div>
+        <div className="text-xs text-app-fg-muted">▍</div>
       )}
 
       {/* Action buttons */}
@@ -843,7 +856,13 @@ function AssistantMessage({
           {isApplicable && !pendingChoice && (
             <ActionButton
               icon={applied ? <Check size={12} /> : <FileEdit size={12} />}
-              label={applied ? "已应用" : "应用到编辑器"}
+              label={
+                applied
+                  ? "已应用"
+                  : contentType === "outline"
+                    ? "应用为本篇大纲"
+                    : "应用到编辑器"
+              }
               onClick={() => onRequestApply(msg.content)}
               active={applied}
             />
@@ -901,7 +920,7 @@ function ActionButton({
       onClick={onClick}
       disabled={active}
       className={cn(
-        "flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10.5px] transition-colors border",
+        "flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors border",
         active
           ? "bg-app-surface text-app-fg-subtle border-app-border/40 cursor-default"
           : "bg-app-surface-hover text-app-fg-muted hover:text-app-fg border-app-border/50"

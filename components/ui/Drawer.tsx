@@ -61,7 +61,7 @@ export function Drawer({
             <div className="px-5 py-4 border-b border-app-border flex items-start justify-between">
               <div>
                 {title && (
-                  <Dialog.Title className="text-sm font-semibold text-app-fg">
+                  <Dialog.Title className="text-[13px] font-semibold text-app-fg">
                     {title}
                   </Dialog.Title>
                 )}

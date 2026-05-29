@@ -98,7 +98,7 @@ export function LinkCardDialog({
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && fetchMeta()}
               placeholder="https://..."
-              className="flex-1 h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-sm font-mono placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
+              className="flex-1 h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-xs font-mono placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
             />
             <Button onClick={fetchMeta} disabled={busy || !url}>
               {busy ? <Loader2 size={13} className="animate-spin" /> : "抓取"}
@@ -107,7 +107,7 @@ export function LinkCardDialog({
         </label>
 
         {error && (
-          <div className="text-[12px] text-red-700 dark:text-red-400">
+          <div className="text-xs text-red-700 dark:text-red-400">
             ⚠ {error}
           </div>
         )}

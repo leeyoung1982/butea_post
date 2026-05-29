@@ -108,7 +108,7 @@ export function VideoEmbedDialog({
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://www.youtube.com/watch?v=... 或 https://www.bilibili.com/video/BVxxx"
-            className="mt-1 w-full h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-sm font-mono placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
+            className="mt-1 w-full h-9 px-2.5 rounded-md border border-app-border bg-app-bg text-xs font-mono placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg-muted"
           />
         </label>
         {parsed && parsed.provider !== "unknown" && (

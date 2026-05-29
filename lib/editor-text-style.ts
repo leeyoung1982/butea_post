@@ -128,20 +128,23 @@ export const LineHeight = Extension.create({
 // =====================================================================
 
 export const FONT_SIZE_PRESETS = [
-  { label: "极小", value: "12px" },
-  { label: "小", value: "14px" },
-  { label: "默认", value: null }, // clears the mark
-  { label: "中", value: "18px" },
-  { label: "大", value: "22px" },
-  { label: "特大", value: "28px" },
-  { label: "标题", value: "36px" },
+  { label: "极小", value: "10px" },
+  { label: "小", value: "12px" },
+  { label: "默认", value: null }, // clears the mark → inherits .ProseMirror 14px
+  { label: "中", value: "16px" },
+  { label: "大", value: "20px" },
+  { label: "特大", value: "26px" },
+  { label: "标题", value: "34px" },
 ];
 
+// Line-height tiers. Gaps need to be visually perceptible — keeping 舒适 at
+// 1.8 made it almost indistinguishable from the editor's default 1.7. The
+// scale below gives each step a clear half-step jump.
 export const LINE_HEIGHT_PRESETS = [
   { label: "紧凑", value: "1.3" },
-  { label: "标准", value: null }, // clears
-  { label: "舒适", value: "1.8" },
-  { label: "宽松", value: "2.2" },
+  { label: "标准", value: null }, // clears → falls back to .ProseMirror 1.7
+  { label: "舒适", value: "2.0" },
+  { label: "宽松", value: "2.4" },
 ];
 
 export const COLOR_PRESETS = [

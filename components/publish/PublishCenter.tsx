@@ -182,7 +182,7 @@ export function PublishCenter() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-app-border">
-        <div className="text-sm font-medium">发布中心</div>
+        <div className="text-[13px] font-semibold">发布中心</div>
         <div className="text-[11px] text-app-fg-muted mt-0.5">
           选择平台，预览效果，一键复制或下载
         </div>
@@ -322,7 +322,7 @@ export function PublishCenter() {
             )}
             {/* HTML preview (compact) */}
             <div
-              className="preview-root bg-white rounded border border-app-border p-4 text-sm max-h-[300px] overflow-auto"
+              className="preview-root bg-white rounded border border-app-border p-4 text-xs max-h-[300px] overflow-auto"
               dangerouslySetInnerHTML={{ __html: output.html }}
             />
             {output.previewCss && (
@@ -434,7 +434,7 @@ export function PublishCenter() {
           <div className="p-3 space-y-3">
             <div className="bg-app-bg border border-app-border rounded-lg p-3">
               <div className="text-[10px] text-app-fg-subtle mb-1">标题</div>
-              <div className="text-sm font-semibold flex items-center justify-between">
+              <div className="text-xs font-semibold flex items-center justify-between">
                 {output.title}
                 <button
                   onClick={() => copyText("title", output.title)}
@@ -452,7 +452,7 @@ export function PublishCenter() {
               {output.cards.map((c) => (
                 <div
                   key={c.n}
-                  className="aspect-[3/4] rounded-md p-2 text-[9px]"
+                  className="aspect-[3/4] rounded-md p-2 text-[10px]"
                   style={{
                     background:
                       "linear-gradient(160deg, #FFEDD5 0%, #FECDD3 100%)",

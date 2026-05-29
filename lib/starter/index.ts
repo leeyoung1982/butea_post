@@ -51,7 +51,7 @@ export const STARTER_DOCS: StarterDoc[] = [
       fontTitle: "system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif",
       fontBody: "system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif",
       fontCode: "'JetBrains Mono', 'Fira Code', Menlo, monospace",
-      bodySize: "16px",
+      bodySize: "14px",
       lineHeight: "1.85",
       paragraphSpacing: "1.4em",
       h1Style: "plain",

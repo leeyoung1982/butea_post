@@ -38,7 +38,7 @@ export function AppDialog({
             <div className="px-6 py-4 border-b border-app-border flex items-start justify-between">
               <div>
                 {title && (
-                  <Dialog.Title className="text-base font-semibold">
+                  <Dialog.Title className="text-[13px] font-semibold">
                     {title}
                   </Dialog.Title>
                 )}

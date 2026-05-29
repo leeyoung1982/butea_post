@@ -78,9 +78,9 @@ export function SkillLibrary({
             onClick={() => onPick(s)}
             className="flex items-start gap-2.5 text-left p-2 rounded-md hover:bg-app-surface-hover border border-transparent hover:border-app-border transition-colors"
           >
-            <span className="text-base shrink-0 leading-none mt-0.5">{s.emoji}</span>
+            <span className="text-sm shrink-0 leading-none mt-0.5">{s.emoji}</span>
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-app-fg">{s.name}</span>
+              <span className="block text-xs font-medium text-app-fg">{s.name}</span>
               <span className="block text-[11px] text-app-fg-muted leading-snug mt-0.5">
                 {s.short}
               </span>

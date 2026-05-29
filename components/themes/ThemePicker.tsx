@@ -136,7 +136,7 @@ function ThemeRow({
         ))}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-app-fg">{theme.name}</div>
+        <div className="text-xs font-medium text-app-fg">{theme.name}</div>
         <div className="text-[11px] text-app-fg-muted truncate">
           {theme.tagline}
         </div>
@@ -190,12 +190,12 @@ const FONT_OPTIONS = [
 ];
 
 const SIZE_OPTIONS = [
+  { label: "12px", value: "12px" },
+  { label: "13px", value: "13px" },
   { label: "14px", value: "14px" },
   { label: "15px", value: "15px" },
   { label: "16px", value: "16px" },
-  { label: "17px", value: "17px" },
   { label: "18px", value: "18px" },
-  { label: "20px", value: "20px" },
 ];
 
 const LINE_HEIGHT_OPTIONS = [

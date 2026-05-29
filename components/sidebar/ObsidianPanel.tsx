@@ -117,7 +117,7 @@ export function ObsidianPanel() {
     return (
       <div className="flex flex-col h-full">
         <div className="px-4 py-3 border-b border-app-border">
-          <div className="text-sm font-medium">Obsidian Vault</div>
+          <div className="text-[13px] font-semibold">Obsidian Vault</div>
           <div className="text-[11px] text-app-fg-muted mt-0.5">
             选择 Vault 文件夹，浏览笔记并导入到编辑器
           </div>
@@ -144,7 +144,7 @@ export function ObsidianPanel() {
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-app-border flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium flex items-center gap-1.5">
+          <div className="text-[13px] font-semibold flex items-center gap-1.5">
             <BookOpen size={13} />
             {rootHandle.name}
           </div>

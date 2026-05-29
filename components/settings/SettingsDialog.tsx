@@ -104,7 +104,7 @@ function NavItem({
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left",
+        "w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors text-left",
         active
           ? "bg-app-surface text-app-fg border-r-2 border-app-fg"
           : "text-app-fg-muted hover:text-app-fg hover:bg-app-surface-hover"
@@ -117,10 +117,10 @@ function NavItem({
 
 function AboutSection() {
   return (
-    <div className="text-sm space-y-3 text-app-fg-muted leading-relaxed">
+    <div className="text-xs space-y-3 text-app-fg-muted leading-relaxed">
       <div>
-        <div className="text-base font-semibold text-app-fg">Butea</div>
-        <div className="text-xs text-app-fg-muted italic">
+        <div className="text-[13px] font-semibold text-app-fg">Butea</div>
+        <div className="text-[11px] text-app-fg-muted italic">
           Rooted ideas, Branching out.
         </div>
       </div>

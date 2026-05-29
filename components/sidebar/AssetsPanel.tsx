@@ -84,7 +84,7 @@ export function AssetsPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-app-border">
-        <div className="text-sm font-medium">资产 / Assets</div>
+        <div className="text-[13px] font-semibold">资产 / Assets</div>
         <div className="text-[11px] text-app-fg-muted mt-0.5">
           图片 · GIF · 视频 · AI 生成 · 拖入的本地媒体
         </div>
@@ -328,7 +328,7 @@ function AssetCard({
         <div className="text-[10px] text-app-fg truncate" title={rec.name}>
           {rec.name}
         </div>
-        <div className="text-[9px] text-app-fg-subtle">
+        <div className="text-[10px] text-app-fg-subtle">
           {formatSize(rec.size)} · {relativeTime(rec.createdAt)}
         </div>
       </div>

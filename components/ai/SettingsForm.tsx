@@ -105,7 +105,7 @@ export function SettingsForm({
     !imageApiKey.trim();
 
   return (
-    <form onSubmit={submit} className="space-y-4 text-sm">
+    <form onSubmit={submit} className="space-y-4 text-xs">
       {/* ====== Writing preferences (first — most important) ====== */}
       <Section
         icon={<PenLine size={13} />}

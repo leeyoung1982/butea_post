@@ -73,7 +73,7 @@ export function LibraryPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-app-border">
-        <div className="text-sm font-medium">文档库</div>
+        <div className="text-[13px] font-semibold">文档库</div>
         <div className="text-[11px] text-app-fg-muted mt-0.5">
           所有本地文档 · 外部笔记源 · 回收站
         </div>
@@ -186,11 +186,11 @@ function ExternalTab({
                 )}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-app-fg">
+                  <span className="text-xs font-medium text-app-fg">
                     {s.label}
                   </span>
                   {!s.ready && (
-                    <span className="text-[9px] uppercase tracking-wider text-app-fg-subtle">
+                    <span className="text-[10px] uppercase tracking-wider text-app-fg-subtle">
                       即将
                     </span>
                   )}
@@ -219,7 +219,7 @@ function ComingSoon({ name, blurb }: { name: string; blurb: string }) {
   return (
     <div className="p-5 text-center space-y-2">
       <Plug size={20} className="mx-auto text-app-fg-subtle" />
-      <div className="text-sm font-medium text-app-fg-muted">{name} 即将支持</div>
+      <div className="text-xs font-medium text-app-fg-muted">{name} 即将支持</div>
       <p className="text-[11px] text-app-fg-muted leading-relaxed">{blurb}</p>
       <div className="pt-2 text-[10px] text-app-fg-subtle">
         v0.5 路线 · 已规划
@@ -449,7 +449,7 @@ function DocRow({
           )}
           {active && !editing && (
             <span
-              className="shrink-0 inline-flex items-center gap-1 px-1.5 py-[1px] rounded-full text-[9px] uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900"
+              className="shrink-0 inline-flex items-center gap-1 px-1.5 py-[1px] rounded-full text-[10px] uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900"
               title="此文档正在编辑器中打开"
             >
               <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />

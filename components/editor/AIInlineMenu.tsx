@@ -147,7 +147,7 @@ export function AIInlineMenu() {
                 >
                   <span className="mt-0.5 text-app-fg-muted">{a.icon}</span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-app-fg">
+                    <span className="block text-xs font-medium text-app-fg">
                       {a.label}
                     </span>
                     <span className="block text-[11px] text-app-fg-muted leading-snug mt-0.5">
@@ -171,7 +171,7 @@ export function AIInlineMenu() {
               >
                 <ImageIcon size={13} className="mt-0.5 text-app-fg-muted" />
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium text-app-fg">
+                  <span className="block text-xs font-medium text-app-fg">
                     生成文中插图
                   </span>
                   <span className="block text-[11px] text-app-fg-muted leading-snug mt-0.5">
@@ -187,7 +187,7 @@ export function AIInlineMenu() {
               >
                 <Newspaper size={13} className="mt-0.5 text-app-fg-muted" />
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium text-app-fg">
+                  <span className="block text-xs font-medium text-app-fg">
                     生成封面
                   </span>
                   <span className="block text-[11px] text-app-fg-muted leading-snug mt-0.5">
@@ -337,7 +337,7 @@ function AIInlineDialog({
       <div className="p-5 space-y-3">
         {action.needsSelection && initial.text && (
           <Section title="原文">
-            <div className="bg-app-bg border border-app-border rounded p-3 text-[12px] leading-relaxed whitespace-pre-wrap max-h-[120px] overflow-auto text-app-fg-muted">
+            <div className="bg-app-bg border border-app-border rounded p-3 text-xs leading-relaxed whitespace-pre-wrap max-h-[120px] overflow-auto text-app-fg-muted">
               {initial.text}
             </div>
           </Section>
@@ -350,20 +350,20 @@ function AIInlineDialog({
             placeholder="比如：加一个具体数据 / 改成提问式开头 / 避免出现 XX 这个词…"
             disabled={busy}
             rows={2}
-            className="w-full bg-app-bg border border-app-border rounded p-2.5 text-[12px] leading-relaxed text-app-fg placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg/40 resize-none disabled:opacity-50"
+            className="w-full bg-app-bg border border-app-border rounded p-2.5 text-xs leading-relaxed text-app-fg placeholder:text-app-fg-subtle focus:outline-none focus:border-app-fg/40 resize-none disabled:opacity-50"
           />
         </Section>
 
         {(busy || output || error) && (
           <Section title={busy ? "生成中（流式）" : "AI 输出"}>
             {error && (
-              <div className="text-[12px] text-red-700 dark:text-red-400 mb-2 flex items-start gap-1.5">
+              <div className="text-xs text-red-700 dark:text-red-400 mb-2 flex items-start gap-1.5">
                 <span>⚠</span>
                 <span>{error}</span>
               </div>
             )}
             {(busy || output) && (
-              <div className="bg-app-bg border border-app-border rounded p-3 text-[12px] leading-relaxed whitespace-pre-wrap min-h-[120px] max-h-[300px] overflow-auto">
+              <div className="bg-app-bg border border-app-border rounded p-3 text-xs leading-relaxed whitespace-pre-wrap min-h-[120px] max-h-[300px] overflow-auto">
                 {stripFence(output) || (
                   <span className="inline-flex items-center gap-2 text-app-fg-subtle">
                     <Loader2 size={12} className="animate-spin" />

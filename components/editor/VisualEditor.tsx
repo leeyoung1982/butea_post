@@ -428,7 +428,7 @@ function VisualToolbar({
                 >
                   <Upload size={13} className="mt-0.5 text-app-fg-muted" />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-app-fg">
+                    <span className="block text-xs font-medium text-app-fg">
                       上传本地文件
                     </span>
                     <span className="block text-[11px] text-app-fg-muted leading-snug mt-0.5">
@@ -444,7 +444,7 @@ function VisualToolbar({
                 >
                   <Globe size={13} className="mt-0.5 text-app-fg-muted" />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-app-fg">
+                    <span className="block text-xs font-medium text-app-fg">
                       粘贴公网 URL
                     </span>
                     <span className="block text-[11px] text-app-fg-muted leading-snug mt-0.5">
@@ -957,7 +957,7 @@ function HighlightDropdown({
                 editor.chain().focus().unsetHalfHighlight().run()
               }
               title="清除标注"
-              className="w-6 h-6 rounded border border-app-border hover:scale-110 transition-transform flex items-center justify-center text-[9px] text-app-fg-muted"
+              className="w-6 h-6 rounded border border-app-border hover:scale-110 transition-transform flex items-center justify-center text-[10px] text-app-fg-muted"
             >
               清
             </button>
