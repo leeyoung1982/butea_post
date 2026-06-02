@@ -41,7 +41,17 @@ export function Workspace() {
       {/* Top bar */}
       <header className="h-10 shrink-0 border-b border-app-border flex items-center justify-between px-2.5 bg-app-surface">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex items-center gap-1.5 px-1">
+          {/* Logo doubles as "home" button — toggles the doc library panel
+              without touching the editor's current draft. Standard web habit
+              (logo → home) without a separate landing route. */}
+          <button
+            type="button"
+            onClick={() =>
+              setSidebarPanel(sidebarPanel === "library" ? null : "library")
+            }
+            title="文档库"
+            className="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-app-surface-hover transition-colors -ml-0.5"
+          >
             <Image
               src="/logo-type.png"
               alt="享寫"
@@ -53,7 +63,7 @@ export function Workspace() {
             <span className="text-[13px] font-semibold tracking-tight">
               享寫
             </span>
-          </div>
+          </button>
           <div className="h-3.5 w-px bg-app-border" />
           <div className="flex items-center gap-1 text-xs text-app-fg-subtle truncate max-w-[300px]">
             <FileText size={11} className="shrink-0 opacity-60" />
